@@ -1,0 +1,20 @@
+{
+    "Id": "123",
+    "Statement": [
+        {
+            "Action": [
+                "something:*"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "NotAction": [
+                "something:*"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        }
+    ],
+    "Version": "2012-10-17"
+}

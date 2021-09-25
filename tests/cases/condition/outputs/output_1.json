@@ -1,0 +1,23 @@
+{
+    "Id": "123",
+    "Statement": [
+        {
+            "Action": [
+                "something:Do1",
+                "something:Do2"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "iam:AWSServiceName": [
+                        "firstservice",
+                        "secondservice",
+                        "fourthservice"
+                    ]
+                }
+            },
+            "Effect": "Allow",
+            "Resource": "*"
+        }
+    ],
+    "Version": "2012-10-17"
+}

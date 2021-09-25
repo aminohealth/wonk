@@ -1,0 +1,34 @@
+{
+    "Id": "123",
+    "Statement": [
+        {
+            "Action": [
+                "something:Do1",
+                "something:Do2"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Action": [
+                "something:Do1",
+                "something:Do2"
+            ],
+            "Effect": "Allow",
+            "Principal": "arn:some_resource1",
+            "Resource": "*"
+        },
+        {
+            "Action": [
+                "something:Do1",
+                "something:Do2",
+                "something:Do3",
+                "something:Do4"
+            ],
+            "Effect": "Allow",
+            "Principal": "arn:some_resource2",
+            "Resource": "*"
+        }
+    ],
+    "Version": "2012-10-17"
+}

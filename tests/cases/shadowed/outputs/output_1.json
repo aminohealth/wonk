@@ -1,0 +1,14 @@
+{
+    "Id": "123",
+    "Statement": [
+        {
+            "Action": [
+                "another:Action*String",
+                "something:*"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        }
+    ],
+    "Version": "2012-10-17"
+}

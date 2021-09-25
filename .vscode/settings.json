@@ -1,0 +1,10 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.coverage": true,
+        "**/.mypy_cache/": true,
+        "**/.pytest_cache/": true,
+        ".venv/": true,
+    },
+    "restructuredtext.confPath": "",
+}
