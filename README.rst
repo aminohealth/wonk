@@ -116,9 +116,9 @@ A managed policy ``Foo`` is fetched by the ARN ``arn:aws:iam::aws:policy/Foo``. 
 Installation
 ============
 
-Today: clone this repo and run ``poetry install``.
+``pip install wonk``
 
-Soon: ``pip install wonk``.
+Alternatively: clone this repo and run ``poetry install``.
 
 Usage
 =====

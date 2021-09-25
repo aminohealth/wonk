@@ -1,9 +1,23 @@
 [tool.poetry]
 name = "wonk"
-version = "0.5.1"
+version = "0.5.2"
 description = "Wonk is a tool for combining a set of AWS policy files into smaller compiled policy sets."
 license = "Apache-2.0"
 authors = ["Kirk Strauser <kirk@amino.com>"]
+readme = "README.rst"
+homepage = "https://github.com/aminohealth/wonk"
+repository = "https://github.com/aminohealth/wonk.git"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: System :: Systems Administration"
+]
 
 [tool.poetry.dependencies]
 python = "^3.7"
