@@ -33,7 +33,7 @@ Wonk to the rescue! You can combine them into one big policy with a command line
 
     $ wonk combine -p MyPolicy AWSPolicy1.json AWSPolicy2.json
 
-which reads the contents of ``AWSPolicy1.json`` and ``AWSPolicy2.json`` and merges them into a ``MyPolicy.json`` file.
+which reads the contents of ``AWSPolicy1.json`` and ``AWSPolicy2.json`` and merges them into a ``MyPolicy_1.json`` file.
 
 Your roles share a lot of common permissions
 --------------------------------------------
@@ -175,7 +175,7 @@ Note: actions are always grouped by similar principals, resources, conditions, e
 Breaking up is hard to do
 -------------------------
 
-Wonk does whatever it can to make a policy fit within that magic 6,144 character limit, but somethings that just can't be done. If you try to combine 30 different non-overlapping policies, there's a decent chance that the end result simply can't be shrunk enough. A careful reader might have noticed that all of the command examples specify an output "base" instead of a specific filename, and an output ``Foo`` ends up creating a file named ``Foo.json``. This is because in the case that Wonk can't pack everything into a separate file, it creates a **set** of as few output policies as possible to include all of the actions. The general process is this:
+Wonk does whatever it can to make a policy fit within that magic 6,144 character limit, but somethings that just can't be done. If you try to combine 30 different non-overlapping policies, there's a decent chance that the end result simply can't be shrunk enough. A careful reader might have noticed that all of the command examples specify an output "base" instead of a specific filename, and an output ``Foo`` ends up creating a file named ``Foo_1.json``. This is because in the case that Wonk can't pack everything into a separate file, it creates a **set** of as few output policies as possible to include all of the actions. The general process is this:
 
 * Try to make everything fit.
 * If there are any statements with so many actions that they can't be shrunk into the size limit, split them up into equal-size chunks that do fit.
@@ -187,7 +187,7 @@ Policy sets
 
 The end result of many Wonk operations is a collection of files, a **policy set**, named ``<base>_1.json`` through ``<base>_N.json`` where N <= 10. This is different from most utilities which operate on individual files, but Wonk can't know how many files it will be creating in advance.
 
-Why 10? Because AWS usually won't allow you to attach more than 10 policies to a user, group, or role. Since policy sets work together like one giant policy and can't be split up, Wonk won't create a policy set that can't actually be attached to anything. If you're bumping up against this limit, consider creating 2 policy sets and applying them to 2 distinct but groups (like ``Backend_1`` and ``Backend_2``), then putting each relevant user into both groups. Alternatively, if your policies cover 99 actions like ``Service:OnePermission`` and ``Service:Another`` on a service that only has 100 possible actions, and you've done your due diligence and don't mind giving your users access to that 100th action, consider adding a ``Service:*`` action to a local policy. That will replace all those individual actions with the single wildcard. Likewise, if you mean to give your users access to all of the various ``Service:GetThis`` and ``Service:GetThat`` actions, you can cover them all at once with ``Service:Get*``. This also has the nice side effect of documenting that you actually intend to allow access to all of the ``Get*`` actions.
+Why 10? Because AWS usually won't allow you to attach more than 10 policies to a user, group, or role. Since policy sets work together like one giant policy and can't be split up, Wonk won't create a policy set that can't actually be attached to anything. If you're bumping up against this limit, consider creating 2 policy sets and applying them to 2 distinct but related groups (like ``Backend_1`` and ``Backend_2``), then putting each relevant user into both groups. Alternatively, if your policies cover 99 actions like ``Service:OnePermission`` and ``Service:Another`` on a service that only has 100 possible actions, and you've done your due diligence and don't mind giving your users access to that 100th action, consider adding a ``Service:*`` action to a local policy. That will replace all those individual actions with the single wildcard. Likewise, if you mean to give your users access to all of the various ``Service:GetThis`` and ``Service:GetThat`` actions, you can cover them all at once with ``Service:Get*``. This also has the nice side effect of documenting that you actually intend to allow access to all of the ``Get*`` actions.
 
 Terraforming combined policies
 ==============================
