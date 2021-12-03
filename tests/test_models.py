@@ -43,19 +43,20 @@ STATEMENT_DENY_NOTRESOURCE = {
 def test_canonicalize_actions_removes_dupes():
     """Duplicate actions are removed."""
 
-    assert models.canonicalize_actions(["foo", "bar", "foo"]) == ["bar", "foo"]
+    # This is vacuously true as sets are deduplicated by their nature.
+    assert models.canonicalize_actions({"foo", "bar", "foo"}) == ["bar", "foo"]
 
 
 def test_canonicalize_actions_removes_servicewide_shadows():
     """Shadowed actions at the service level are removed."""
 
-    assert models.canonicalize_actions(["svc:spam", "svc:*", "svc:eggs"]) == ["svc:*"]
+    assert models.canonicalize_actions({"svc:spam", "svc:*", "svc:eggs"}) == ["svc:*"]
 
 
 def test_canonicalize_actions_removes_prefixed_shadows():
     """Shadowed actions whose names match wildcards with prefixes are removed."""
 
-    assert models.canonicalize_actions(["svc:GetSomething", "svc:PutSomething", "svc:Get*"]) == [
+    assert models.canonicalize_actions({"svc:GetSomething", "svc:PutSomething", "svc:Get*"}) == [
         "svc:Get*",
         "svc:PutSomething",
     ]

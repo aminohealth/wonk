@@ -51,3 +51,8 @@ line-length = 99
 [tool.isort]
 profile="black"
 line_length=99
+
+[tool.mypy]
+check_untyped_defs=true
+ignore_missing_imports=true
+files="**/*.py"
