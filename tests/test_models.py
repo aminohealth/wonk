@@ -62,6 +62,50 @@ def test_canonicalize_actions_removes_prefixed_shadows():
     ]
 
 
+def test_canonicalize_actions_removes_prefixed_shadows_multiple_wildcards():
+    """Shadowed actions in sets with with multiple wildcards are pruned correctly."""
+
+    assert (
+        models.canonicalize_actions(
+            {
+                "s3:Get*",
+                "s3:*",
+                "s3:List*",
+                "s3:Head*",
+            }
+        )
+        == ["s3:*"]
+    )
+
+
+def test_canonicalize_actions_removes_prefixed_shadows_inconvenient_order():
+    """The order of actions doesn't matter when pruning shadowed actions."""
+
+    assert (
+        models.canonicalize_actions(
+            {
+                "s3:GetFoo",
+                "s3:GetFoo*",
+            }
+        )
+        == ["s3:GetFoo*"]
+    )
+
+
+def test_canonicalize_actions_removes_prefixed_shadows_ignore_case():
+    """Wildcard actions which differ only in case are treated as the same action."""
+
+    assert (
+        models.canonicalize_actions(
+            {
+                "s3:getfoo*",
+                "s3:GetFoo*",
+            }
+        )
+        == ["s3:GetFoo*"]
+    )
+
+
 @pytest.mark.parametrize(
     "statement,expected",
     [
