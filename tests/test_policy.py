@@ -1,5 +1,7 @@
 """Test the wonk.policy module."""
 
+import textwrap
+
 import pytest
 
 from wonk import exceptions, policy
@@ -46,17 +48,17 @@ def test_write_policy_leaves_expected_results(tmp_path):
     }
 
     # foo_1.json and foo_2.json have their supplied contents.
-    assert (
-        (tmp_path / "foo_1.json").read_text()
-        == """{
-    "foo": "something"
-}"""
+    assert (tmp_path / "foo_1.json").read_text() == textwrap.dedent(
+        """\
+        {
+            "foo": "something"
+        }"""
     )
-    assert (
-        (tmp_path / "foo_2.json").read_text()
-        == """{
-    "bar": "something"
-}"""
+    assert (tmp_path / "foo_2.json").read_text() == textwrap.dedent(
+        """\
+        {
+            "bar": "something"
+        }"""
     )
 
 
