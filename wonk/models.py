@@ -104,39 +104,50 @@ class InternalStatement:
         )
 
 
+def deduped_actions(actions: Set[str]) -> List[str]:
+    """Return a sorted list of all the unique items in `actions`, ignoring case."""
+
+    # First, group all actions by their lowercased values. This lumps "foo" and "FOO" together.
+    unique: Dict[str, List[str]] = {}
+    for action in actions:
+        unique.setdefault(action.lower(), []).append(action)
+
+    # Sort the dictionary by it's lowercased keys, then return the first item in each key's sorted
+    # list of values. For instance, if `unique["foo"] == ["fOO", "FOO"]`, then return "FOO" (which
+    # comes first when ["foo", "FOO"] is sorted).
+    return [sorted(values)[0] for _, values in sorted(unique.items())]
+
+
 def canonicalize_actions(actions: Set[str]) -> Union[str, List[str]]:
-    """Return the set of actions as either a single string or a sorted list of strings."""
+    """Return the set of actions as either a single string or a sorted list of strings.
+
+    This also removes wildcard matches from the set. If the set contains both "foo*" and "foobar",
+    "foobar" will be removed because "foo*" already covers it.
+    """
 
     if len(actions) == 1:
         return next(iter(actions))
 
-    keep_actions = set()
-
-    # See if any of the actions look like "service:*". If so, we can discard any other actions like
-    # "service:Foo" because they're already covered by the wildcard. This loop builds a list of
-    # regular expressions that we can use to weed out redundant actions.
-    #
-    # Note that this could be much easier if you could guarantee that "*" would only be at the end
-    # of the stream. Then you could sort the actions, and when you come across one ending with "*",
-    # discard all of the following ones that start with the same string up until that "*". However,
-    # even though we haven't stumbled across cases like "Foo*Bar" in the wild, nothing says they
-    # can't exist.
-    discard_patterns = []
+    # Build a dict of wildcard actions to their regular expressions.
+    patterns: Dict[str, re.Pattern] = {}
     for action in actions:
         if "*" not in action:
             continue
-        pattern = action.replace("*", ".*")
-        discard_patterns.append(re.compile(fr"^{pattern}$"))
-        # Keep the wildcard action!
-        keep_actions.add(action)
 
-    # Throw away any actions that are matched by any of the wildcard patterns defined in the
-    # previous step.
-    for action in actions:
-        if not any(pattern.match(action) for pattern in discard_patterns):
-            keep_actions.add(action)
+        pattern_string = action.replace("*", ".*")
+        patterns[action.lower()] = re.compile(fr"^{pattern_string}$", re.IGNORECASE)
 
-    return sorted(keep_actions)
+    new_actions = []
+    for action in deduped_actions(actions):
+        # If this action matches any of the patterns (other than itself!), then skip it. If it
+        # doesn't, add it to the list of actions to keep.
+        if not any(
+            pattern_action != action.lower() and pattern.match(action)
+            for pattern_action, pattern in patterns.items()
+        ):
+            new_actions.append(action)
+
+    return new_actions
 
 
 def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:

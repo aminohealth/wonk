@@ -1,5 +1,7 @@
 """Test the wonk.policy module."""
 
+import textwrap
+
 import pytest
 
 from wonk import exceptions, policy
@@ -14,7 +16,7 @@ def test_write_policy_set_doesnt_run_amok(tmp_path):
         (tmp_path / f"foo_{i}.json").write_text("fnord")
 
     with pytest.raises(exceptions.TooManyPoliciesError) as exc:
-        policy.write_policy_set(tmp_path, "foo", ["foo", "bar"])
+        policy.write_policy_set(tmp_path, "foo", [{"foo": "something"}, {"bar": "something"}])
 
     assert exc.value.policy_set == "foo"
     assert exc.value.policies == 12
@@ -28,7 +30,9 @@ def test_write_policy_leaves_expected_results(tmp_path):
         (tmp_path / f"foo_{i}.json").write_text('{"what": "fnord"}')
         (tmp_path / f"foo_bar_{i}.json").write_text('{"what": "fnord"}')
 
-    written = policy.write_policy_set(tmp_path, "foo", ["foo", "bar"])
+    written = policy.write_policy_set(
+        tmp_path, "foo", [{"foo": "something"}, {"bar": "something"}]
+    )
 
     assert written == [f"{tmp_path}/foo_1.json", f"{tmp_path}/foo_2.json"]
 
@@ -44,8 +48,18 @@ def test_write_policy_leaves_expected_results(tmp_path):
     }
 
     # foo_1.json and foo_2.json have their supplied contents.
-    assert (tmp_path / "foo_1.json").read_text() == '"foo"'
-    assert (tmp_path / "foo_2.json").read_text() == '"bar"'
+    assert (tmp_path / "foo_1.json").read_text() == textwrap.dedent(
+        """\
+        {
+            "foo": "something"
+        }"""
+    )
+    assert (tmp_path / "foo_2.json").read_text() == textwrap.dedent(
+        """\
+        {
+            "bar": "something"
+        }"""
+    )
 
 
 def test_fetch_retrieves_policy(mocker):

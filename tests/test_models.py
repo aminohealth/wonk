@@ -43,22 +43,67 @@ STATEMENT_DENY_NOTRESOURCE = {
 def test_canonicalize_actions_removes_dupes():
     """Duplicate actions are removed."""
 
-    assert models.canonicalize_actions(["foo", "bar", "foo"]) == ["bar", "foo"]
+    # This is vacuously true as sets are deduplicated by their nature.
+    assert models.canonicalize_actions({"foo", "bar", "foo"}) == ["bar", "foo"]
 
 
 def test_canonicalize_actions_removes_servicewide_shadows():
     """Shadowed actions at the service level are removed."""
 
-    assert models.canonicalize_actions(["svc:spam", "svc:*", "svc:eggs"]) == ["svc:*"]
+    assert models.canonicalize_actions({"svc:spam", "svc:*", "svc:eggs"}) == ["svc:*"]
 
 
 def test_canonicalize_actions_removes_prefixed_shadows():
     """Shadowed actions whose names match wildcards with prefixes are removed."""
 
-    assert models.canonicalize_actions(["svc:GetSomething", "svc:PutSomething", "svc:Get*"]) == [
+    assert models.canonicalize_actions({"svc:GetSomething", "svc:PutSomething", "svc:Get*"}) == [
         "svc:Get*",
         "svc:PutSomething",
     ]
+
+
+def test_canonicalize_actions_removes_prefixed_shadows_multiple_wildcards():
+    """Shadowed actions in sets with with multiple wildcards are pruned correctly."""
+
+    assert (
+        models.canonicalize_actions(
+            {
+                "s3:Get*",
+                "s3:*",
+                "s3:List*",
+                "s3:Head*",
+            }
+        )
+        == ["s3:*"]
+    )
+
+
+def test_canonicalize_actions_removes_prefixed_shadows_inconvenient_order():
+    """The order of actions doesn't matter when pruning shadowed actions."""
+
+    assert (
+        models.canonicalize_actions(
+            {
+                "s3:GetFoo",
+                "s3:GetFoo*",
+            }
+        )
+        == ["s3:GetFoo*"]
+    )
+
+
+def test_canonicalize_actions_removes_prefixed_shadows_ignore_case():
+    """Wildcard actions which differ only in case are treated as the same action."""
+
+    assert (
+        models.canonicalize_actions(
+            {
+                "s3:getfoo*",
+                "s3:GetFoo*",
+            }
+        )
+        == ["s3:GetFoo*"]
+    )
 
 
 @pytest.mark.parametrize(
