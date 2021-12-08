@@ -243,3 +243,11 @@ The Policy Wonk is copyright 2021 Amino, Inc. and distributed under the terms of
 .. _jq: https://stedolan.github.io/jq/
 .. _knapsack problem: https://en.wikipedia.org/wiki/Knapsack_problem
 .. _SCIP constraint solver: https://developers.google.com/optimization/mip/integer_opt
+
+History
+=======
+**0.5.3**
+  2021-12-07: More robust shadowed action detection.
+
+**0.5.2**
+  2021-09-24: First public release.
