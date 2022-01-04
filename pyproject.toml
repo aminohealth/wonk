@@ -37,6 +37,7 @@ pylint = "*"
 pytest = "*"
 pytest-mock = "*"
 rstcheck = "*"
+tox = "*"
 
 [tool.poetry.scripts]
 wonk = "wonk.cli:handle_command_line"
