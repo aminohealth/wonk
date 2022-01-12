@@ -165,11 +165,9 @@ def test_grouped_statements():
         }
     ]
 
-    grouped_items = list(policy.grouped_statements([policy1, policy2]).items())
-    assert len(grouped_items) == 1
-    key, value = grouped_items[0]
-    assert key == "['Action', ('Resource', '*'), ('Effect', 'Allow')]"
-    assert value.render() == {
+    statements = policy.grouped_statements([policy1, policy2])
+    assert len(statements) == 1
+    assert statements[0].render() == {
         "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
         "Resource": "*",
         "Effect": "Allow",
@@ -199,11 +197,9 @@ def test_grouped_statements_same_resources():
         }
     ]
 
-    grouped = list(policy.grouped_statements([policy1, policy2]).items())
-    assert len(grouped) == 1
-    key, value = grouped[0]
-    assert key == "['Action', ('Resource', ['bacon', 'eggs', 'spam']), ('Effect', 'Allow')]"
-    assert value.render() == {
+    statements = policy.grouped_statements([policy1, policy2])
+    assert len(statements) == 1
+    assert statements[0].render() == {
         "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
         "Resource": ["bacon", "eggs", "spam"],
         "Effect": "Allow",
@@ -233,20 +229,16 @@ def test_grouped_statements_diffent_resources():
         }
     ]
 
-    grouped = list(policy.grouped_statements([policy1, policy2]).items())
-    assert len(grouped) == 2
+    statements = policy.grouped_statements([policy1, policy2])
+    assert len(statements) == 2
 
-    key, value = grouped[0]
-    assert key == "['Action', ('Resource', ['bacon', 'spam']), ('Effect', 'Allow')]"
-    assert value.render() == {
+    assert statements[0].render() == {
         "Action": ["SVC:Action1", "SVC:Action2"],
         "Effect": "Allow",
         "Resource": ["bacon", "spam"],
     }
 
-    key, value = grouped[1]
-    assert key == "['Action', ('Resource', ['eggs', 'spam']), ('Effect', 'Allow')]"
-    assert value.render() == {
+    assert statements[1].render() == {
         "Action": ["SVC:Action2", "SVC:Action3"],
         "Effect": "Allow",
         "Resource": ["eggs", "spam"],
@@ -276,20 +268,16 @@ def test_grouped_statements_notresources():
         }
     ]
 
-    grouped = list(policy.grouped_statements([policy1, policy2]).items())
-    assert len(grouped) == 2
+    statements = policy.grouped_statements([policy1, policy2])
+    assert len(statements) == 2
 
-    key, value = grouped[0]
-    assert key == "['Action', ('Resource', ['bacon', 'eggs', 'spam']), ('Effect', 'Allow')]"
-    assert value.render() == {
+    assert statements[0].render() == {
         "Action": ["SVC:Action1", "SVC:Action2"],
         "Effect": "Allow",
         "Resource": ["bacon", "eggs", "spam"],
     }
 
-    key, value = grouped[1]
-    assert key == "['Action', ('NotResource', ['bacon', 'eggs', 'spam']), ('Effect', 'Allow')]"
-    assert value.render() == {
+    assert statements[1].render() == {
         "Action": ["SVC:Action2", "SVC:Action3"],
         "Effect": "Allow",
         "NotResource": ["bacon", "eggs", "spam"],
@@ -326,12 +314,7 @@ def test_render():
         }
     )
 
-    statement_set = {
-        statement.grouping_key(): statement
-        for statement in (statement_1, statement_2, statement_3)
-    }
-
-    rendered = policy.render(statement_set)
+    rendered = policy.render([statement_1, statement_2, statement_3])
     rendered.pop("Id", None)
 
     assert rendered == {

@@ -17,7 +17,7 @@ from wonk.models import InternalStatement, Policy, Statement, which_type
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
 
-def grouped_statements(policies: List[Policy]) -> Dict[str, InternalStatement]:
+def grouped_statements(policies: List[Policy]) -> List[InternalStatement]:
     """Merge the policies' statements by their zone of effect."""
 
     statement_sets: Dict[str, InternalStatement] = {}
@@ -44,7 +44,7 @@ def grouped_statements(policies: List[Policy]) -> Dict[str, InternalStatement]:
             else:
                 existing_item.action_value |= internal_statement.action_value
 
-    return statement_sets
+    return list(statement_sets.values())
 
 
 def blank_policy() -> Policy:
@@ -57,7 +57,7 @@ def blank_policy() -> Policy:
     }
 
 
-def render(statement_sets: Dict[str, InternalStatement]) -> Policy:
+def render(statements: List[InternalStatement]) -> Policy:
     """Turn the contents of the statement sets into a valid AWS policy."""
 
     policy = blank_policy()
@@ -66,7 +66,7 @@ def render(statement_sets: Dict[str, InternalStatement]) -> Policy:
     # the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to see if we're
     # actually updating a policy that we've written out, and if so, skip writing it again (with a
     # new `Id` key).
-    for internal_statement in sorted(statement_sets.values(), key=lambda obj: obj.sorting_key()):
+    for internal_statement in sorted(statements, key=lambda obj: obj.sorting_key()):
         policy[PolicyKey.STATEMENT].append(internal_statement.render())
 
     return policy
