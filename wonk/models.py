@@ -153,10 +153,32 @@ def canonicalize_actions(actions: Set[str]) -> Union[str, List[str]]:
 def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:
     """Return the set of resources as either a single string or a sorted list of strings."""
 
+    if "*" in resources:
+        return "*"
+
     if len(resources) == 1:
         return next(iter(resources))
 
-    return sorted(resources)
+    result = []
+    last_wildcard = None
+    for resource in sorted(resources):
+        if last_wildcard is not None:
+            # Skip this resource if it matches the last wildcard we saw.
+            if resource.startswith(last_wildcard):
+                continue
+
+            # Since it didn't match the wildcard, restart the wildcard to None
+            last_wildcard = None
+
+        if resource.endswith("*"):
+            # Save this for future matching
+            last_wildcard = resource[:-1]
+
+        result.append(resource)
+
+    if len(result) == 1:
+        return result[0]
+    return result
 
 
 def key_as_set(statement: Statement, key: str) -> Set[str]:
