@@ -6,7 +6,7 @@ import math
 import pathlib
 import re
 import uuid
-from typing import Dict, Generator, List, Union
+from typing import Dict, Generator, List, Tuple, Union
 
 from xdg import xdg_cache_home
 
@@ -18,7 +18,7 @@ POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
 
 def minify(policies: List[Policy]) -> List[InternalStatement]:
-    """TK"""
+    """Reduce the input policies to the minimal set of functionally identical equivalents."""
 
     internal_statements: List[InternalStatement] = []
     for policy in policies:
@@ -35,13 +35,18 @@ def minify(policies: List[Policy]) -> List[InternalStatement]:
         for statement in statements:
             internal_statements.append(InternalStatement(statement))
 
-    return grouped_statements(internal_statements)
+    _, internal_statements = grouped_actions(internal_statements)
+    return internal_statements
 
 
-def grouped_statements(statements: List[InternalStatement]) -> List[InternalStatement]:
-    """Merge the policies' statements by their zone of effect."""
+def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
+    """Merge similar policies' actions.
+
+    Returns a list of statements whose actions have been combined when possible.
+    """
 
     statement_sets: Dict[str, InternalStatement] = {}
+    changed = False
 
     for statement in statements:
         group = statement.grouping_for_actions()
@@ -52,8 +57,18 @@ def grouped_statements(statements: List[InternalStatement]) -> List[InternalStat
             statement_sets[group] = statement
         else:
             existing_item.action_value |= statement.action_value
+            changed = True
 
-    return list(statement_sets.values())
+    return changed, list(statement_sets.values())
+
+
+def _grouped_resources(statements: List[InternalStatement]) -> List[InternalStatement]:
+    """Merge similar policies' resources.
+
+    Returns a list of statements whose resources have been combined when possible.
+    """
+
+    return statements
 
 
 def blank_policy() -> Policy:

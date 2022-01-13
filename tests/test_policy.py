@@ -142,7 +142,7 @@ def test_split_statement():
     assert next(splitted) == {"Action": ["c"] * 15 + ["d"] * 15}
 
 
-def test_grouped_statements():
+def test_grouped_actions():
     """Simple statements are grouped as expected, even if their resources are written oddly."""
 
     policy1 = policy.InternalStatement(
@@ -163,7 +163,8 @@ def test_grouped_statements():
         }
     )
 
-    statements = policy.grouped_statements([policy1, policy2])
+    changed, statements = policy.grouped_actions([policy1, policy2])
+    assert changed
     assert len(statements) == 1
     assert statements[0].render() == {
         "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
@@ -172,7 +173,7 @@ def test_grouped_statements():
     }
 
 
-def test_grouped_statements_same_resources():
+def test_grouped_actions_same_resources():
     """Simple statements with the same resources are grouped together."""
 
     policy1 = policy.InternalStatement(
@@ -193,7 +194,8 @@ def test_grouped_statements_same_resources():
         }
     )
 
-    statements = policy.grouped_statements([policy1, policy2])
+    changed, statements = policy.grouped_actions([policy1, policy2])
+    assert changed
     assert len(statements) == 1
     assert statements[0].render() == {
         "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
@@ -202,7 +204,7 @@ def test_grouped_statements_same_resources():
     }
 
 
-def test_grouped_statements_diffent_resources():
+def test_grouped_actions_diffent_resources():
     """Statements with different resources don't get grouped together."""
 
     policy1 = policy.InternalStatement(
@@ -223,7 +225,8 @@ def test_grouped_statements_diffent_resources():
         }
     )
 
-    statements = policy.grouped_statements([policy1, policy2])
+    changed, statements = policy.grouped_actions([policy1, policy2])
+    assert not changed
     assert len(statements) == 2
 
     assert statements[0].render() == {
@@ -239,7 +242,7 @@ def test_grouped_statements_diffent_resources():
     }
 
 
-def test_grouped_statements_notresources():
+def test_grouped_actions_notresources():
     """Statements with Resources don't get grouped with those with NotResources."""
 
     policy1 = policy.InternalStatement(
@@ -260,7 +263,8 @@ def test_grouped_statements_notresources():
         }
     )
 
-    statements = policy.grouped_statements([policy1, policy2])
+    changed, statements = policy.grouped_actions([policy1, policy2])
+    assert not changed
     assert len(statements) == 2
 
     assert statements[0].render() == {
