@@ -1,0 +1,17 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "TestCase1",
+            "Effect": "Allow",
+            "Action": [
+                "A",
+                "B"
+            ],
+            "Resource": [
+                "foo",
+                "bar"
+            ]
+        }
+    ]
+}

@@ -1,0 +1,25 @@
+{
+    "Id": "Whoa",
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+		"A",
+		"B",
+		"C",
+		"D"
+            ],
+            "Resource": [
+		"R5",
+		"R6",
+                "R7",
+                "R8",
+		"bar",
+		"baz",
+		"foo",
+		"qux"
+            ]
+        }
+    ]
+}
