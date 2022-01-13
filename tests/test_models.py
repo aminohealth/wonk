@@ -163,10 +163,10 @@ def test_canonicalize_resources_wildcards():
         ),
     ],
 )
-def test_grouping_key(statement, expected):
+def test_grouping_for_actions(statement, expected):
     """Statements can be grouped by their expected key."""
 
-    assert models.InternalStatement(statement).grouping_key() == expected
+    assert models.InternalStatement(statement).grouping_for_actions() == expected
 
 
 def test_sorting_key():
