@@ -41,9 +41,9 @@ class InternalStatement:
         return statement
 
     def grouping_for_actions(self) -> str:
-        """Return a dict key that can be used to group this statement with others like it.
+        """Make a key that can be used to group this statement's actions with others like it.
 
-        Create a key that can be used to group statements which is similar except for their
+        Create a key that can be used to group statements which are similar except for their
         actions. In other words, if there are two statements that have all of these keys in common,
         then their actions can be combined into a single statement.
 
@@ -54,8 +54,31 @@ class InternalStatement:
         # First, record whether this statement has Action or NotAction keys.
         elems.append(self.action_key)
 
-        # Next, record whether it has a Resource or NotResource (and those canonical values).
+        # Next, record whether it has a Resource or NotResource (and those values).
         elems.append((self.resource_key, self.resource_value))
+
+        # Finally, record the values of all the other keys in the statement
+        for key, value in sorted(self.rest.items()):
+            elems.append((key, value))
+
+        return str(elems)
+
+    def grouping_for_resources(self) -> str:
+        """Make a key that can be used to group this statement's resources with others like it.
+
+        Create a key that can be used to group statements which are similar except for their
+        resources. In other words, if there are two statements that have all of these keys in common,
+        then their resources can be combined into a single statement.
+
+        """
+
+        elems: List[Union[str, Tuple[str, Any]]] = []
+
+        # First, record whether this statement has Action or NotAction keys (and those values).
+        elems.append((self.action_key, sorted(self.action_value)))
+
+        # Next, record whether it has a Resource or NotResource.
+        elems.append(self.resource_key)
 
         # Finally, record the values of all the other keys in the statement
         for key, value in sorted(self.rest.items()):
@@ -182,6 +205,12 @@ def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:
     return result
 
 
+def as_set(value: Union[str, List[str]]) -> Set[str]:
+    if isinstance(value, str):
+        return {value}
+    return set(value)
+
+
 def key_as_set(statement: Statement, key: str) -> Set[str]:
     """Return the content's of the statements key as a (possibly empty) set of strings."""
 
@@ -189,9 +218,7 @@ def key_as_set(statement: Statement, key: str) -> Set[str]:
         value = statement[key]
     except KeyError:
         return set()
-    if isinstance(value, str):
-        return {value}
-    return set(value)
+    return as_set(value)
 
 
 def which_type(statement: Statement, choices: Tuple[StatementKey, StatementKey]) -> str:

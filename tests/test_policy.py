@@ -204,7 +204,7 @@ def test_grouped_actions_same_resources():
     }
 
 
-def test_grouped_actions_diffent_resources():
+def test_grouped_actions_different_resources():
     """Statements with different resources don't get grouped together."""
 
     policy1 = policy.InternalStatement(
@@ -277,6 +277,113 @@ def test_grouped_actions_notresources():
         "Action": ["SVC:Action2", "SVC:Action3"],
         "Effect": "Allow",
         "NotResource": ["bacon", "eggs", "spam"],
+    }
+
+
+def test_grouped_resources():
+    """Simple statements are grouped as expected."""
+
+    policy1 = policy.InternalStatement(
+        {
+            "Sid": "El",
+            "Effect": "Allow",
+            "Resource": ["foo", "bar"],
+            "Action": ["SVC:Action1", "SVC:Action2"],
+        }
+    )
+
+    policy2 = policy.InternalStatement(
+        {
+            "Sid": "Knee",
+            "Effect": "Allow",
+            "Resource": ["bar", "baz"],
+            "Action": ["SVC:Action2", "SVC:Action1"],
+        }
+    )
+
+    changed, statements = policy.grouped_resources([policy1, policy2])
+    assert changed
+    assert len(statements) == 1
+    assert statements[0].render() == {
+        "Action": ["SVC:Action1", "SVC:Action2"],
+        "Resource": ["bar", "baz", "foo"],
+        "Effect": "Allow",
+    }
+
+
+def test_grouped_resources_different_actions():
+    """Statements with different actions don't get grouped together."""
+
+    policy1 = policy.InternalStatement(
+        {
+            "Sid": "El",
+            "Effect": "Allow",
+            "Resource": ["spam", "bacon"],
+            "Action": ["SVC:Action1", "SVC:Action2"],
+        }
+    )
+
+    policy2 = policy.InternalStatement(
+        {
+            "Sid": "Knee",
+            "Effect": "Allow",
+            "Resource": ["spam", "eggs"],
+            "Action": ["SVC:Action2", "SVC:Action3"],
+        }
+    )
+
+    changed, statements = policy.grouped_resources([policy1, policy2])
+    assert not changed
+    assert len(statements) == 2
+
+    assert statements[0].render() == {
+        "Action": ["SVC:Action1", "SVC:Action2"],
+        "Effect": "Allow",
+        "Resource": ["bacon", "spam"],
+    }
+
+    assert statements[1].render() == {
+        "Action": ["SVC:Action2", "SVC:Action3"],
+        "Effect": "Allow",
+        "Resource": ["eggs", "spam"],
+    }
+
+
+def test_grouped_resources_notactions():
+    """Statements with Actions don't get grouped with those with NotActions."""
+
+    policy1 = policy.InternalStatement(
+        {
+            "Sid": "El",
+            "Effect": "Allow",
+            "Resource": ["spam", "bacon", "eggs"],
+            "Action": ["SVC:Action1", "SVC:Action2"],
+        }
+    )
+
+    policy2 = policy.InternalStatement(
+        {
+            "Sid": "Knee",
+            "Effect": "Allow",
+            "Resource": ["spam", "bacon", "eggs"],
+            "NotAction": ["SVC:Action1", "SVC:Action2"],
+        }
+    )
+
+    changed, statements = policy.grouped_resources([policy1, policy2])
+    assert not changed
+    assert len(statements) == 2
+
+    assert statements[0].render() == {
+        "Action": ["SVC:Action1", "SVC:Action2"],
+        "Effect": "Allow",
+        "Resource": ["bacon", "eggs", "spam"],
+    }
+
+    assert statements[1].render() == {
+        "NotAction": ["SVC:Action1", "SVC:Action2"],
+        "Effect": "Allow",
+        "Resource": ["bacon", "eggs", "spam"],
     }
 
 
