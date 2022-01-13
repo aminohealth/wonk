@@ -74,7 +74,7 @@ def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[Int
             new_action_value = existing_item.action_value | statement.action_value
             if existing_item.action_value != new_action_value:
                 changed = True
-            existing_item.action_value = new_action_value
+                existing_item.action_value = new_action_value
 
     return changed, list(statement_sets.values())
 
@@ -101,7 +101,7 @@ def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[I
             )
             if existing_item.resource_value != new_resource_value:
                 changed = True
-            existing_item.resource_value = new_resource_value
+                existing_item.resource_value = new_resource_value
 
     return changed, list(statement_sets.values())
 
