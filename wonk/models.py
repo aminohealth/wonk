@@ -40,12 +40,13 @@ class InternalStatement:
 
         return statement
 
-    def grouping_key(self) -> str:
+    def grouping_for_actions(self) -> str:
         """Return a dict key that can be used to group this statement with others like it.
 
-        Create a key that can be used to group similar statements. In other words, if there are two
-        statements that have all of these keys in common, then they can be combined into a single
-        statement.
+        Create a key that can be used to group statements which is similar except for their
+        actions. In other words, if there are two statements that have all of these keys in common,
+        then their actions can be combined into a single statement.
+
         """
 
         elems: List[Union[str, Tuple[str, Any]]] = []

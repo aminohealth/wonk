@@ -35,7 +35,7 @@ def grouped_statements(policies: List[Policy]) -> List[InternalStatement]:
 
         for statement in statements:
             internal_statement = InternalStatement(statement)
-            group = internal_statement.grouping_key()
+            group = internal_statement.grouping_for_actions()
 
             try:
                 existing_item = statement_sets[group]
