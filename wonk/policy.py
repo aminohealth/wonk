@@ -17,11 +17,10 @@ from wonk.models import InternalStatement, Policy, Statement, which_type
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
 
-def grouped_statements(policies: List[Policy]) -> List[InternalStatement]:
-    """Merge the policies' statements by their zone of effect."""
+def minify(policies: List[Policy]) -> List[InternalStatement]:
+    """TK"""
 
-    statement_sets: Dict[str, InternalStatement] = {}
-
+    internal_statements: List[InternalStatement] = []
     for policy in policies:
         # According to the policy language grammar (see
         # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
@@ -34,15 +33,25 @@ def grouped_statements(policies: List[Policy]) -> List[InternalStatement]:
             statements = [statements]
 
         for statement in statements:
-            internal_statement = InternalStatement(statement)
-            group = internal_statement.grouping_for_actions()
+            internal_statements.append(InternalStatement(statement))
 
-            try:
-                existing_item = statement_sets[group]
-            except KeyError:
-                statement_sets[group] = internal_statement
-            else:
-                existing_item.action_value |= internal_statement.action_value
+    return grouped_statements(internal_statements)
+
+
+def grouped_statements(statements: List[InternalStatement]) -> List[InternalStatement]:
+    """Merge the policies' statements by their zone of effect."""
+
+    statement_sets: Dict[str, InternalStatement] = {}
+
+    for statement in statements:
+        group = statement.grouping_for_actions()
+
+        try:
+            existing_item = statement_sets[group]
+        except KeyError:
+            statement_sets[group] = statement
+        else:
+            existing_item.action_value |= statement.action_value
 
     return list(statement_sets.values())
 
@@ -116,7 +125,7 @@ def split_statement(
 def combine(policies: List[Policy]) -> List[Policy]:
     """Combine policy files into the smallest possible set of outputs."""
 
-    new_policy = render(grouped_statements(policies))
+    new_policy = render(minify(policies))
 
     # Simplest case: we're able to squeeze everything into a single file. This is the ideal.
     try:
@@ -163,7 +172,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
         unmerged_policy[PolicyKey.STATEMENT] = [
             json.loads(statement) for statement in statement_set
         ]
-        merged_policy = render(grouped_statements([unmerged_policy]))
+        merged_policy = render(minify([unmerged_policy]))
         policies.append(merged_policy)
 
     return policies
