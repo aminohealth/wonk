@@ -12,7 +12,14 @@ from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
 from wonk.constants import ACTION_KEYS, JSON_ARGS, MAX_MANAGED_POLICY_SIZE, PolicyKey
-from wonk.models import InternalStatement, Policy, Statement, which_type
+from wonk.models import (
+    InternalStatement,
+    Policy,
+    Statement,
+    as_set,
+    canonicalize_resources,
+    which_type,
+)
 
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
@@ -35,7 +42,15 @@ def minify(policies: List[Policy]) -> List[InternalStatement]:
         for statement in statements:
             internal_statements.append(InternalStatement(statement))
 
-    _, internal_statements = grouped_actions(internal_statements)
+    this_changed = True
+    while this_changed:
+        changed, internal_statements = grouped_actions(internal_statements)
+        if not changed:
+            this_changed = False
+        changed, internal_statements = grouped_resources(internal_statements)
+        if not changed:
+            this_changed = False
+
     return internal_statements
 
 
@@ -56,19 +71,39 @@ def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[Int
         except KeyError:
             statement_sets[group] = statement
         else:
-            existing_item.action_value |= statement.action_value
-            changed = True
+            new_action_value = existing_item.action_value | statement.action_value
+            if existing_item.action_value != new_action_value:
+                changed = True
+            existing_item.action_value = new_action_value
 
     return changed, list(statement_sets.values())
 
 
-def _grouped_resources(statements: List[InternalStatement]) -> List[InternalStatement]:
+def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
     """Merge similar policies' resources.
 
     Returns a list of statements whose resources have been combined when possible.
     """
 
-    return statements
+    statement_sets: Dict[str, InternalStatement] = {}
+    changed = False
+
+    for statement in statements:
+        group = statement.grouping_for_resources()
+
+        try:
+            existing_item = statement_sets[group]
+        except KeyError:
+            statement_sets[group] = statement
+        else:
+            new_resource_value = canonicalize_resources(
+                as_set(existing_item.resource_value) | as_set(statement.resource_value)
+            )
+            if existing_item.resource_value != new_resource_value:
+                changed = True
+            existing_item.resource_value = new_resource_value
+
+    return changed, list(statement_sets.values())
 
 
 def blank_policy() -> Policy:
