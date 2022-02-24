@@ -67,9 +67,8 @@ class InternalStatement:
         """Make a key that can be used to group this statement's resources with others like it.
 
         Create a key that can be used to group statements which are similar except for their
-        resources. In other words, if there are two statements that have all of these keys in common,
-        then their resources can be combined into a single statement.
-
+        resources. In other words, if there are two statements that have all of these keys in
+        common, then their resources can be combined into a single statement.
         """
 
         elems: List[Union[str, Tuple[str, Any]]] = []
@@ -206,6 +205,8 @@ def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:
 
 
 def as_set(value: Union[str, List[str]]) -> Set[str]:
+    """Convert a string or list of strings to a set with that key or keys."""
+
     if isinstance(value, str):
         return {value}
     return set(value)
