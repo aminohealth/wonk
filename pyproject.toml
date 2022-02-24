@@ -21,12 +21,12 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
-boto3 = "^1.17.25"
-ortools = "^8.2.8710"
-pydantic = "^1.8.2"
-PyYAML = "^5.4.1"
+boto3 = "^1.17"
+ortools = "^9"
+pydantic = "^1.8"
+PyYAML = "^5.4"
 toposort = "^1.6"
-xdg = "^5.0.1"
+xdg = "^5.0"
 
 [tool.poetry.dev-dependencies]
 black = "*"
