@@ -5,20 +5,20 @@
         {
             "Effect": "Allow",
             "Action": [
-		"A",
-		"B",
-		"C",
-		"D"
+                "A",
+                "B",
+                "C",
+                "D"
             ],
             "Resource": [
-		"R5",
-		"R6",
+                "R5",
+                "R6",
                 "R7",
                 "R8",
-		"bar",
-		"baz",
-		"foo",
-		"qux"
+                "bar",
+                "baz",
+                "foo",
+                "qux"
             ]
         }
     ]
