@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wonk"
-version = "0.5.3"
+version = "0.5.4"
 description = "Wonk is a tool for combining a set of AWS policy files into smaller compiled policy sets."
 license = "Apache-2.0"
 authors = ["Kirk Strauser <kirk@amino.com>"]
@@ -22,7 +22,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.7"
 boto3 = "^1.17.25"
-ortools = "^8.2.8710"
+ortools = "^9.3.10497"
 pydantic = "^1.8.2"
 PyYAML = "^5.4.1"
 toposort = "^1.6"
