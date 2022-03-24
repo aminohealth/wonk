@@ -237,7 +237,7 @@ the second statement is broader than the first, so the first could be safely rem
 Copyright
 =========
 
-The Policy Wonk is copyright 2021 Amino, Inc. and distributed under the terms of the Apache-2.0 License.
+The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the terms of the Apache-2.0 License.
 
 .. _IAM quotas: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
 .. _jq: https://stedolan.github.io/jq/
