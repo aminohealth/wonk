@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wonk"
-version = "0.5.3"
+version = "0.5.4"
 description = "Wonk is a tool for combining a set of AWS policy files into smaller compiled policy sets."
 license = "Apache-2.0"
 authors = ["Kirk Strauser <kirk@amino.com>"]
