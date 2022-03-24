@@ -22,7 +22,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.7"
 boto3 = "^1.17.25"
-ortools = "^8.2.8710"
+ortools = "^9.3.10497"
 pydantic = "^1.8.2"
 PyYAML = "^5.4.1"
 toposort = "^1.6"
