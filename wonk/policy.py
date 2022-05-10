@@ -16,8 +16,8 @@ from wonk.models import (
     InternalStatement,
     Policy,
     Statement,
-    as_set,
     canonicalize_resources,
+    to_set,
     which_type,
 )
 
@@ -97,7 +97,7 @@ def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[I
             statement_sets[group] = statement
         else:
             new_resource_value = canonicalize_resources(
-                as_set(existing_item.resource_value) | as_set(statement.resource_value)
+                to_set(existing_item.resource_value) | to_set(statement.resource_value)
             )
             if existing_item.resource_value != new_resource_value:
                 changed = True

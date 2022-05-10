@@ -127,50 +127,56 @@ class InternalStatement:
         )
 
 
-def deduped_actions(actions: Set[str]) -> List[str]:
-    """Return a sorted list of all the unique items in `actions`, ignoring case."""
+def deduped_items(items: Set[str]) -> List[str]:
+    """Return a sorted list of all the unique items in `items`, ignoring case."""
 
-    # First, group all actions by their lowercased values. This lumps "foo" and "FOO" together.
+    # First, group all items by their casefolded values. This lumps "foo" and "FOO" together.
     unique: Dict[str, List[str]] = {}
-    for action in actions:
-        unique.setdefault(action.lower(), []).append(action)
+    for item in items:
+        unique.setdefault(item.casefold(), []).append(item)
 
-    # Sort the dictionary by it's lowercased keys, then return the first item in each key's sorted
+    # Sort the dictionary by it's casefolded keys, then return the first item in each key's sorted
     # list of values. For instance, if `unique["foo"] == ["fOO", "FOO"]`, then return "FOO" (which
     # comes first when ["foo", "FOO"] is sorted).
     return [sorted(values)[0] for _, values in sorted(unique.items())]
 
 
-def canonicalize_actions(actions: Set[str]) -> Union[str, List[str]]:
-    """Return the set of actions as either a single string or a sorted list of strings.
+def collect_wildcard_matches(items: Set[str]) -> Union[str, List[str]]:
+    """Return the reduced set of items as either a single string or a sorted list of strings.
 
-    This also removes wildcard matches from the set. If the set contains both "foo*" and "foobar",
+    This removes wildcard matches from the set. If the set contains both "foo*" and "foobar",
     "foobar" will be removed because "foo*" already covers it.
     """
 
-    if len(actions) == 1:
-        return next(iter(actions))
+    if len(items) == 1:
+        return items.pop()
 
-    # Build a dict of wildcard actions to their regular expressions.
+    # Build a dict of wildcard items to their regular expressions.
     patterns: Dict[str, re.Pattern] = {}
-    for action in actions:
-        if "*" not in action:
+    for item in items:
+        if "*" not in item:
             continue
 
-        pattern_string = action.replace("*", ".*")
-        patterns[action.lower()] = re.compile(fr"^{pattern_string}$", re.IGNORECASE)
+        pattern_string = item.replace("*", ".*")
+        patterns[item.casefold()] = re.compile(fr"^{pattern_string}$", re.IGNORECASE)
 
-    new_actions = []
-    for action in deduped_actions(actions):
-        # If this action matches any of the patterns (other than itself!), then skip it. If it
-        # doesn't, add it to the list of actions to keep.
+    new_items = []
+    for item in deduped_items(items):
+        # If this item matches any of the patterns (other than itself!), then skip it. If it
+        # doesn't, add it to the list of items to keep.
         if not any(
-            pattern_action != action.lower() and pattern.match(action)
-            for pattern_action, pattern in patterns.items()
+            pattern_item != item.casefold() and pattern.match(item)
+            for pattern_item, pattern in patterns.items()
         ):
-            new_actions.append(action)
+            new_items.append(item)
 
-    return new_actions
+    return new_items
+
+
+def canonicalize_actions(actions: Set[str]) -> Union[str, List[str]]:
+    """Return the set of actions as a sorted list of strings."""
+
+    return collect_wildcard_matches(actions)
 
 
 def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:

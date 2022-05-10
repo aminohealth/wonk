@@ -246,6 +246,9 @@ The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the ter
 
 History
 =======
+**0.5.5**
+  2022-05-10: Make multiple compression passes over statements.
+
 **0.5.4**
   2022-03-24: Upgrade ortools to 9.3.10497.
 
