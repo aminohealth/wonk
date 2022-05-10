@@ -5,7 +5,7 @@ import textwrap
 import pytest
 
 from wonk import exceptions, policy
-from wonk.constants import PolicyKey
+from wonk.models import Policy
 
 
 def test_write_policy_set_doesnt_run_amok(tmp_path):
@@ -16,7 +16,11 @@ def test_write_policy_set_doesnt_run_amok(tmp_path):
         (tmp_path / f"foo_{i}.json").write_text("fnord")
 
     with pytest.raises(exceptions.TooManyPoliciesError) as exc:
-        policy.write_policy_set(tmp_path, "foo", [{"foo": "something"}, {"bar": "something"}])
+        policy.write_policy_set(
+            tmp_path,
+            "foo",
+            [Policy(statement={"foo": "something"}), Policy(statement={"bar": "something"})],
+        )
 
     assert exc.value.policy_set == "foo"
     assert exc.value.policies == 12
@@ -33,7 +37,7 @@ def test_write_policy_leaves_expected_results(tmp_path):
     written = policy.write_policy_set(
         tmp_path,
         "foo",
-        [{"Statement": {"foo": "something"}}, {"Statement": {"bar": "something"}}],
+        [Policy(statement={"foo": "something"}), Policy(statement={"bar": "something"})],
     )
 
     assert written == [f"{tmp_path}/foo_1.json", f"{tmp_path}/foo_2.json"]
@@ -53,7 +57,8 @@ def test_write_policy_leaves_expected_results(tmp_path):
     assert (tmp_path / "foo_1.json").read_text() == textwrap.dedent(
         """\
         {
-            "Id": "e4cd4ec6c23f8cf878f22c99b6edf909",
+            "Version": "2012-10-17",
+            "Id": "1161c90d42eab499ee1929f669bc9fe9",
             "Statement": {
                 "foo": "something"
             }
@@ -62,7 +67,8 @@ def test_write_policy_leaves_expected_results(tmp_path):
     assert (tmp_path / "foo_2.json").read_text() == textwrap.dedent(
         """\
         {
-            "Id": "35fda171edeffab70d23db34d53e3f80",
+            "Version": "2012-10-17",
+            "Id": "be9d9ca35c42b85ce6ba7a8229624995",
             "Statement": {
                 "bar": "something"
             }
@@ -94,15 +100,14 @@ def test_fetch_retrieves_policy(mocker):
 def test_policy_combine_small():
     """Combining one small policy does as expected."""
 
-    policies = policy.combine([{"Statement": [{"Action": "Dance!", "Resource": ["Disco"]}]}])
+    policies = policy.combine([Policy(statement=[{"Action": "Dance!", "Resource": ["Disco"]}])])
 
     assert len(policies) == 1
 
     new_policy = policies[0]
-    assert new_policy == {
-        "Version": "2012-10-17",
-        "Statement": [{"Action": "Dance!", "Resource": "Disco"}],
-    }
+    assert new_policy == Policy(
+        version="2012-10-17", statement=[{"Action": "Dance!", "Resource": "Disco"}]
+    )
 
 
 def test_policy_combine_big():
@@ -113,7 +118,7 @@ def test_policy_combine_big():
     c_len = int(policy.MAX_MANAGED_POLICY_SIZE * 0.4)
 
     old_policies = [
-        {"Statement": [{"Action": [char * length], "NotResource": "spam"}]}
+        Policy(statement=[{"Action": [char * length], "NotResource": "spam"}])
         for char, length in [("a", a_len), ("b", b_len), ("c", c_len)]
     ]
 
@@ -121,15 +126,14 @@ def test_policy_combine_big():
 
     new_policy_1, new_policy_2 = policies
 
-    assert new_policy_1 == {
-        "Version": "2012-10-17",
-        "Statement": [{"Action": ["a" * a_len, "c" * c_len], "NotResource": "spam"}],
-    }
+    assert new_policy_1 == Policy(
+        version="2012-10-17",
+        statement=[{"Action": ["a" * a_len, "c" * c_len], "NotResource": "spam"}],
+    )
 
-    assert new_policy_2 == {
-        "Version": "2012-10-17",
-        "Statement": [{"Action": "b" * b_len, "NotResource": "spam"}],
-    }
+    assert new_policy_2 == Policy(
+        version="2012-10-17", statement=[{"Action": "b" * b_len, "NotResource": "spam"}]
+    )
 
 
 def test_split_statement():
@@ -421,21 +425,24 @@ def test_render():
     )
 
     rendered = policy.render([statement_1, statement_2, statement_3])
-    rendered.pop("Id", None)
+    #    rendered.pop("Id", None)
 
-    assert rendered == {
-        "Statement": [
+    assert rendered == Policy(
+        statement=[
             {
                 "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
                 "Effect": "Allow",
                 "Resource": "*",
             },
-            {"Action": ["SVC:BadAction1", "SVC:BadAction4"], "Effect": "Deny", "Resource": "*"},
+            {
+                "Action": ["SVC:BadAction1", "SVC:BadAction4"],
+                "Effect": "Deny",
+                "Resource": "*",
+            },
             {
                 "Effect": "Allow",
                 "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
                 "Resource": "*",
             },
-        ],
-        "Version": "2012-10-17",
-    }
+        ]
+    )
