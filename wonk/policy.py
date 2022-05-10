@@ -1,17 +1,15 @@
 """Manage AWS policies."""
 
-import copy
 import json
 import math
 import pathlib
 import re
-from hashlib import sha256
-from typing import Dict, Generator, List, Tuple, Union
+from typing import Dict, Generator, List, Tuple
 
 from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
-from wonk.constants import ACTION_KEYS, JSON_ARGS, MAX_MANAGED_POLICY_SIZE, PolicyKey
+from wonk.constants import ACTION_KEYS, JSON_ARGS, MAX_MANAGED_POLICY_SIZE
 from wonk.models import (
     InternalStatement,
     Policy,
@@ -35,7 +33,7 @@ def minify(policies: List[Policy]) -> List[InternalStatement]:
         # Some of Amazon's own policies (see AWSCertificateManagerReadOnly) have a Statement key
         # that points to a dict instead of a list of dicts. This ensures that we're always dealing
         # with a list of statements.
-        statements = policy[PolicyKey.STATEMENT]
+        statements = policy.statement
         if isinstance(statements, dict):
             statements = [statements]
 
@@ -106,43 +104,22 @@ def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[I
     return changed, list(statement_sets.values())
 
 
-def blank_policy() -> Policy:
-    """Return the skeleton of a policy with no statments."""
-
-    return {
-        PolicyKey.VERSION: "2012-10-17",
-        PolicyKey.STATEMENT: [],
-    }
-
-
 def render(statements: List[InternalStatement]) -> Policy:
     """Turn the contents of the statement sets into a valid AWS policy."""
-
-    policy = blank_policy()
 
     # Sort everything that can be sorted. This ensures that separate runs of the program generate
     # the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to see if we're
     # actually updating a policy that we've written out, and if so, skip writing it again (with a
     # new `Id` key).
-    for internal_statement in sorted(statements, key=lambda obj: obj.sorting_key()):
-        policy[PolicyKey.STATEMENT].append(internal_statement.render())
-
-    return policy
-
-
-def packed_json(data: Policy, max_size: int) -> str:
-    """Return the most aesthetic representation of the data that fits in the size."""
-    for args in JSON_ARGS:
-        packed = json.dumps(data, sort_keys=True, **args)
-        if len(packed) <= max_size:
-            return packed
-
-    raise exceptions.UnshrinkablePolicyError(
-        f"Unable to shrink the data into into {max_size} characters: {data!r}"
+    return Policy(
+        statement=[
+            statement.render()
+            for statement in sorted(statements, key=lambda obj: obj.sorting_key())
+        ]
     )
 
 
-def tiniest_json(data: Union[Policy, Statement]) -> str:
+def tiniest_json(data: Statement) -> str:
     """Return the smallest representation of the data."""
     return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
 
@@ -178,7 +155,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
 
     # Simplest case: we're able to squeeze everything into a single file. This is the ideal.
     try:
-        packed_json(new_policy, MAX_MANAGED_POLICY_SIZE)
+        new_policy.render()
     except exceptions.UnshrinkablePolicyError:
         pass
     else:
@@ -193,8 +170,8 @@ def combine(policies: List[Policy]) -> List[Policy]:
     # and it's guaranteed that we can fit at most n-1 statements into a single document because if
     # we could fit all n then we wouldn't have made it to this point in the program. And yes, this
     # is exactly the part of the program where we start caring about every byte.
-    statements = new_policy[PolicyKey.STATEMENT]
-    minimum_possible_policy_size = len(tiniest_json(blank_policy()))
+    statements = new_policy.statement
+    minimum_possible_policy_size = len(Policy().tiniest_json())
     max_number_of_commas = len(statements) - 2
     max_statement_size = (
         MAX_MANAGED_POLICY_SIZE - minimum_possible_policy_size - max_number_of_commas
@@ -217,10 +194,8 @@ def combine(policies: List[Policy]) -> List[Policy]:
         # that could be merged back together. The easiest way to handle this is to create a new
         # policy as-is, then group its statements together into *another* new, optimized policy,
         # and emit that one.
-        unmerged_policy = blank_policy()
-        unmerged_policy[PolicyKey.STATEMENT] = [
-            json.loads(statement) for statement in statement_set
-        ]
+        unmerged_policy = Policy()
+        unmerged_policy.statement = [json.loads(statement) for statement in statement_set]
         merged_policy = render(minify([unmerged_policy]))
         policies.append(merged_policy)
 
@@ -275,51 +250,16 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
         except FileNotFoundError:
             pass
         else:
-            if policies_are_identical(on_disk_policy, policy):
+            if policy == Policy.from_dict(on_disk_policy):
                 continue
 
-        output_path.write_text(packed_json(policy_with_id(policy), MAX_MANAGED_POLICY_SIZE))
+        output_path.write_text(policy.render())
 
     # Delete all of the pre-existing files, minus the ones we visited above.
     for old in cleanup:
         old.unlink()
 
     return output_filenames
-
-
-def policy_with_id(policy: Policy) -> Policy:
-    """Return a copy of the Policy with the Id computed from the Policy's contents."""
-
-    policy = copy.deepcopy(policy)
-
-    statements = tiniest_json(policy[PolicyKey.STATEMENT])
-
-    digest = sha256(statements.encode()).hexdigest()[:32]
-    policy[PolicyKey.ID] = digest
-
-    return policy
-
-
-def policies_are_identical(old_policy: Policy, new_policy: Policy) -> bool:
-    """Return True if the old and new policies are identical other than their IDs."""
-
-    old_policy, new_policy = copy.deepcopy(old_policy), copy.deepcopy(new_policy)
-
-    try:
-        # If the on-disk policy is missing the `Id` key, then the policy's been altered and we know
-        # it's no longer identical to the new one.
-        del old_policy[PolicyKey.ID]
-    except KeyError:
-        return False
-
-    new_policy.pop(PolicyKey.ID, None)
-
-    # We minimize churn by sorting collections whenever possible so that they're always output in
-    # the same order if the input policies haven't changed. That's better (and in the long run,
-    # easier) than implementing an order-insensitive comparison here because it also keeps the
-    # on-disk policy stable between runs. This makes git happy.
-
-    return old_policy == new_policy
 
 
 def make_cache_file(name: str, version: str) -> pathlib.Path:

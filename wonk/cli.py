@@ -6,9 +6,11 @@ import argparse
 import json
 import pathlib
 import sys
+from typing import List
 
 from wonk.aws import arn_for, iam_client, name_for
 from wonk.config import load_config
+from wonk.models import Policy
 from wonk.policy import combine, fetch, write_policy_set
 
 
@@ -47,7 +49,7 @@ def command_line_build(args):
         for local_policy in config.local:
             input_filenames.append(f"local/{local_policy}.json")
 
-        policies = [json.loads(pathlib.Path(filename).read_text()) for filename in input_filenames]
+        policies = policies_from_filenames(input_filenames)
         output_filenames = write_policy_set(args.path, policy_set, combine(policies))
 
         print()
@@ -58,10 +60,20 @@ def command_line_build(args):
         print()
 
 
+def policies_from_filenames(filenames: List[str]) -> List[Policy]:
+    """Return a list of Policy objects from the contents of the named files."""
+
+    policies = []
+    for filename in filenames:
+        data = json.loads(pathlib.Path(filename).read_text())
+        policies.append(Policy.from_dict(data))
+    return policies
+
+
 def command_line_combine(args):
     """Combine multiple policies into a small number of policies."""
 
-    policies = [json.loads(pathlib.Path(filename).read_text()) for filename in args.policy]
+    policies = policies_from_filenames(args.policy)
     filenames = write_policy_set(args.path, args.policy_set, combine(policies))
 
     print("Created the following files:")
