@@ -21,11 +21,11 @@ class InternalStatement:
         statement.pop(StatementKey.SID, None)
 
         self.action_key = which_type(statement, ACTION_KEYS)
-        self.action_value = key_as_set(statement, self.action_key)
+        self.action_value = value_to_set(statement, self.action_key)
         statement.pop(self.action_key)
 
         self.resource_key = which_type(statement, RESOURCE_KEYS)
-        self.resource_value = canonicalize_resources(key_as_set(statement, self.resource_key))
+        self.resource_value = canonicalize_resources(value_to_set(statement, self.resource_key))
         statement.pop(self.resource_key)
 
         self.rest = statement
@@ -179,32 +179,10 @@ def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:
     if "*" in resources:
         return "*"
 
-    if len(resources) == 1:
-        return next(iter(resources))
-
-    result = []
-    last_wildcard = None
-    for resource in sorted(resources):
-        if last_wildcard is not None:
-            # Skip this resource if it matches the last wildcard we saw.
-            if resource.startswith(last_wildcard):
-                continue
-
-            # Since it didn't match the wildcard, restart the wildcard to None
-            last_wildcard = None
-
-        if resource.endswith("*"):
-            # Save this for future matching
-            last_wildcard = resource[:-1]
-
-        result.append(resource)
-
-    if len(result) == 1:
-        return result[0]
-    return result
+    return collect_wildcard_matches(resources)
 
 
-def as_set(value: Union[str, List[str]]) -> Set[str]:
+def to_set(value: Union[str, List[str]]) -> Set[str]:
     """Convert a string or list of strings to a set with that key or keys."""
 
     if isinstance(value, str):
@@ -212,14 +190,14 @@ def as_set(value: Union[str, List[str]]) -> Set[str]:
     return set(value)
 
 
-def key_as_set(statement: Statement, key: str) -> Set[str]:
+def value_to_set(statement: Statement, key: str) -> Set[str]:
     """Return the content's of the statements key as a (possibly empty) set of strings."""
 
     try:
         value = statement[key]
     except KeyError:
         return set()
-    return as_set(value)
+    return to_set(value)
 
 
 def which_type(statement: Statement, choices: Tuple[StatementKey, StatementKey]) -> str:
