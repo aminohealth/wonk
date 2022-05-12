@@ -6,22 +6,28 @@ import math
 import pathlib
 import re
 import uuid
-from typing import Dict, Generator, List, Union
+from typing import Dict, Generator, List, Tuple, Union
 
 from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
 from wonk.constants import ACTION_KEYS, JSON_ARGS, MAX_MANAGED_POLICY_SIZE, PolicyKey
-from wonk.models import InternalStatement, Policy, Statement, which_type
+from wonk.models import (
+    InternalStatement,
+    Policy,
+    Statement,
+    canonicalize_resources,
+    to_set,
+    which_type,
+)
 
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
 
-def grouped_statements(policies: List[Policy]) -> Dict[str, InternalStatement]:
-    """Merge the policies' statements by their zone of effect."""
+def minify(policies: List[Policy]) -> List[InternalStatement]:
+    """Reduce the input policies to the minimal set of functionally identical equivalents."""
 
-    statement_sets: Dict[str, InternalStatement] = {}
-
+    internal_statements: List[InternalStatement] = []
     for policy in policies:
         # According to the policy language grammar (see
         # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
@@ -34,17 +40,70 @@ def grouped_statements(policies: List[Policy]) -> Dict[str, InternalStatement]:
             statements = [statements]
 
         for statement in statements:
-            internal_statement = InternalStatement(statement)
-            group = internal_statement.grouping_key()
+            internal_statements.append(InternalStatement(statement))
 
-            try:
-                existing_item = statement_sets[group]
-            except KeyError:
-                statement_sets[group] = internal_statement
-            else:
-                existing_item.action_value |= internal_statement.action_value
+    this_changed = True
+    while this_changed:
+        changed, internal_statements = grouped_actions(internal_statements)
+        if not changed:
+            this_changed = False
+        changed, internal_statements = grouped_resources(internal_statements)
+        if not changed:
+            this_changed = False
 
-    return statement_sets
+    return internal_statements
+
+
+def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
+    """Merge similar policies' actions.
+
+    Returns a list of statements whose actions have been combined when possible.
+    """
+
+    statement_sets: Dict[str, InternalStatement] = {}
+    changed = False
+
+    for statement in statements:
+        group = statement.grouping_for_actions()
+
+        try:
+            existing_item = statement_sets[group]
+        except KeyError:
+            statement_sets[group] = statement
+        else:
+            new_action_value = existing_item.action_value | statement.action_value
+            if existing_item.action_value != new_action_value:
+                changed = True
+                existing_item.action_value = new_action_value
+
+    return changed, list(statement_sets.values())
+
+
+def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
+    """Merge similar policies' resources.
+
+    Returns a list of statements whose resources have been combined when possible.
+    """
+
+    statement_sets: Dict[str, InternalStatement] = {}
+    changed = False
+
+    for statement in statements:
+        group = statement.grouping_for_resources()
+
+        try:
+            existing_item = statement_sets[group]
+        except KeyError:
+            statement_sets[group] = statement
+        else:
+            new_resource_value = canonicalize_resources(
+                to_set(existing_item.resource_value) | to_set(statement.resource_value)
+            )
+            if existing_item.resource_value != new_resource_value:
+                changed = True
+                existing_item.resource_value = new_resource_value
+
+    return changed, list(statement_sets.values())
 
 
 def blank_policy() -> Policy:
@@ -57,7 +116,7 @@ def blank_policy() -> Policy:
     }
 
 
-def render(statement_sets: Dict[str, InternalStatement]) -> Policy:
+def render(statements: List[InternalStatement]) -> Policy:
     """Turn the contents of the statement sets into a valid AWS policy."""
 
     policy = blank_policy()
@@ -66,7 +125,7 @@ def render(statement_sets: Dict[str, InternalStatement]) -> Policy:
     # the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to see if we're
     # actually updating a policy that we've written out, and if so, skip writing it again (with a
     # new `Id` key).
-    for internal_statement in sorted(statement_sets.values(), key=lambda obj: obj.sorting_key()):
+    for internal_statement in sorted(statements, key=lambda obj: obj.sorting_key()):
         policy[PolicyKey.STATEMENT].append(internal_statement.render())
 
     return policy
@@ -116,7 +175,7 @@ def split_statement(
 def combine(policies: List[Policy]) -> List[Policy]:
     """Combine policy files into the smallest possible set of outputs."""
 
-    new_policy = render(grouped_statements(policies))
+    new_policy = render(minify(policies))
 
     # Simplest case: we're able to squeeze everything into a single file. This is the ideal.
     try:
@@ -163,7 +222,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
         unmerged_policy[PolicyKey.STATEMENT] = [
             json.loads(statement) for statement in statement_set
         ]
-        merged_policy = render(grouped_statements([unmerged_policy]))
+        merged_policy = render(minify([unmerged_policy]))
         policies.append(merged_policy)
 
     return policies

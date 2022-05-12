@@ -106,6 +106,46 @@ def test_canonicalize_actions_removes_prefixed_shadows_ignore_case():
     )
 
 
+def test_canonicalize_resources_all():
+    """If resources contain "*", then that's the only one that counts."""
+
+    assert models.canonicalize_resources({"foo", "bar", "*"}) == "*"
+
+
+def test_canonicalize_resources_one():
+    """If there's only one resource, return it."""
+
+    assert models.canonicalize_resources({"foo"}) == "foo"
+
+
+def test_canonicalize_resources_just_strings():
+    """If all the resources are strings without wildcards, return them in order."""
+
+    assert models.canonicalize_resources({"foo", "bar", "baz"}) == ["bar", "baz", "foo"]
+
+
+def test_canonicalize_resources_wildcards():
+    """If any of the resources are strings with wildcards, remove the shadowed resources."""
+
+    assert (
+        models.canonicalize_resources(
+            {
+                "arn:something42",
+                "arn:something23",
+                "arn:something*",
+                "arn:a*",
+                "arn:aa",
+                "arn:aaa",
+                "arn:ba*",
+                "arn:bad",
+                "arn:bb",
+                "arn:bc",
+            }
+        )
+        == ["arn:a*", "arn:ba*", "arn:bb", "arn:bc", "arn:something*"]
+    )
+
+
 @pytest.mark.parametrize(
     "statement,expected",
     [
@@ -123,10 +163,10 @@ def test_canonicalize_actions_removes_prefixed_shadows_ignore_case():
         ),
     ],
 )
-def test_grouping_key(statement, expected):
+def test_grouping_for_actions(statement, expected):
     """Statements can be grouped by their expected key."""
 
-    assert models.InternalStatement(statement).grouping_key() == expected
+    assert models.InternalStatement(statement).grouping_for_actions() == expected
 
 
 def test_sorting_key():

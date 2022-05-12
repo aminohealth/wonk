@@ -21,11 +21,11 @@ class InternalStatement:
         statement.pop(StatementKey.SID, None)
 
         self.action_key = which_type(statement, ACTION_KEYS)
-        self.action_value = key_as_set(statement, self.action_key)
+        self.action_value = value_to_set(statement, self.action_key)
         statement.pop(self.action_key)
 
         self.resource_key = which_type(statement, RESOURCE_KEYS)
-        self.resource_value = canonicalize_resources(key_as_set(statement, self.resource_key))
+        self.resource_value = canonicalize_resources(value_to_set(statement, self.resource_key))
         statement.pop(self.resource_key)
 
         self.rest = statement
@@ -40,12 +40,13 @@ class InternalStatement:
 
         return statement
 
-    def grouping_key(self) -> str:
-        """Return a dict key that can be used to group this statement with others like it.
+    def grouping_for_actions(self) -> str:
+        """Make a key that can be used to group this statement's actions with others like it.
 
-        Create a key that can be used to group similar statements. In other words, if there are two
-        statements that have all of these keys in common, then they can be combined into a single
-        statement.
+        Create a key that can be used to group statements which are similar except for their
+        actions. In other words, if there are two statements that have all of these keys in common,
+        then their actions can be combined into a single statement.
+
         """
 
         elems: List[Union[str, Tuple[str, Any]]] = []
@@ -53,8 +54,30 @@ class InternalStatement:
         # First, record whether this statement has Action or NotAction keys.
         elems.append(self.action_key)
 
-        # Next, record whether it has a Resource or NotResource (and those canonical values).
+        # Next, record whether it has a Resource or NotResource (and those values).
         elems.append((self.resource_key, self.resource_value))
+
+        # Finally, record the values of all the other keys in the statement
+        for key, value in sorted(self.rest.items()):
+            elems.append((key, value))
+
+        return str(elems)
+
+    def grouping_for_resources(self) -> str:
+        """Make a key that can be used to group this statement's resources with others like it.
+
+        Create a key that can be used to group statements which are similar except for their
+        resources. In other words, if there are two statements that have all of these keys in
+        common, then their resources can be combined into a single statement.
+        """
+
+        elems: List[Union[str, Tuple[str, Any]]] = []
+
+        # First, record whether this statement has Action or NotAction keys (and those values).
+        elems.append((self.action_key, sorted(self.action_value)))
+
+        # Next, record whether it has a Resource or NotResource.
+        elems.append(self.resource_key)
 
         # Finally, record the values of all the other keys in the statement
         for key, value in sorted(self.rest.items()):
@@ -104,71 +127,83 @@ class InternalStatement:
         )
 
 
-def deduped_actions(actions: Set[str]) -> List[str]:
-    """Return a sorted list of all the unique items in `actions`, ignoring case."""
+def deduped_items(items: Set[str]) -> List[str]:
+    """Return a sorted list of all the unique items in `items`, ignoring case."""
 
-    # First, group all actions by their lowercased values. This lumps "foo" and "FOO" together.
+    # First, group all items by their casefolded values. This lumps "foo" and "FOO" together.
     unique: Dict[str, List[str]] = {}
-    for action in actions:
-        unique.setdefault(action.lower(), []).append(action)
+    for item in items:
+        unique.setdefault(item.casefold(), []).append(item)
 
-    # Sort the dictionary by it's lowercased keys, then return the first item in each key's sorted
+    # Sort the dictionary by it's casefolded keys, then return the first item in each key's sorted
     # list of values. For instance, if `unique["foo"] == ["fOO", "FOO"]`, then return "FOO" (which
     # comes first when ["foo", "FOO"] is sorted).
     return [sorted(values)[0] for _, values in sorted(unique.items())]
 
 
-def canonicalize_actions(actions: Set[str]) -> Union[str, List[str]]:
-    """Return the set of actions as either a single string or a sorted list of strings.
+def collect_wildcard_matches(items: Set[str]) -> Union[str, List[str]]:
+    """Return the reduced set of items as either a single string or a sorted list of strings.
 
-    This also removes wildcard matches from the set. If the set contains both "foo*" and "foobar",
+    This removes wildcard matches from the set. If the set contains both "foo*" and "foobar",
     "foobar" will be removed because "foo*" already covers it.
     """
 
-    if len(actions) == 1:
-        return next(iter(actions))
+    if len(items) == 1:
+        return items.pop()
 
-    # Build a dict of wildcard actions to their regular expressions.
+    # Build a dict of wildcard items to their regular expressions.
     patterns: Dict[str, re.Pattern] = {}
-    for action in actions:
-        if "*" not in action:
+    for item in items:
+        if "*" not in item:
             continue
 
-        pattern_string = action.replace("*", ".*")
-        patterns[action.lower()] = re.compile(fr"^{pattern_string}$", re.IGNORECASE)
+        pattern_string = item.replace("*", ".*")
+        patterns[item.casefold()] = re.compile(fr"^{pattern_string}$", re.IGNORECASE)
 
-    new_actions = []
-    for action in deduped_actions(actions):
-        # If this action matches any of the patterns (other than itself!), then skip it. If it
-        # doesn't, add it to the list of actions to keep.
+    new_items = []
+    for item in deduped_items(items):
+        # If this item matches any of the patterns (other than itself!), then skip it. If it
+        # doesn't, add it to the list of items to keep.
         if not any(
-            pattern_action != action.lower() and pattern.match(action)
-            for pattern_action, pattern in patterns.items()
+            pattern_item != item.casefold() and pattern.match(item)
+            for pattern_item, pattern in patterns.items()
         ):
-            new_actions.append(action)
+            new_items.append(item)
 
-    return new_actions
+    return new_items
+
+
+def canonicalize_actions(actions: Set[str]) -> Union[str, List[str]]:
+    """Return the set of actions as a sorted list of strings."""
+
+    return collect_wildcard_matches(actions)
 
 
 def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:
     """Return the set of resources as either a single string or a sorted list of strings."""
 
-    if len(resources) == 1:
-        return next(iter(resources))
+    if "*" in resources:
+        return "*"
 
-    return sorted(resources)
+    return collect_wildcard_matches(resources)
 
 
-def key_as_set(statement: Statement, key: str) -> Set[str]:
+def to_set(value: Union[str, List[str]]) -> Set[str]:
+    """Convert a string or list of strings to a set with that key or keys."""
+
+    if isinstance(value, str):
+        return {value}
+    return set(value)
+
+
+def value_to_set(statement: Statement, key: str) -> Set[str]:
     """Return the content's of the statements key as a (possibly empty) set of strings."""
 
     try:
         value = statement[key]
     except KeyError:
         return set()
-    if isinstance(value, str):
-        return {value}
-    return set(value)
+    return to_set(value)
 
 
 def which_type(statement: Statement, choices: Tuple[StatementKey, StatementKey]) -> str:

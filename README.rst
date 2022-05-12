@@ -175,7 +175,7 @@ Note: actions are always grouped by similar principals, resources, conditions, e
 Breaking up is hard to do
 -------------------------
 
-Wonk does whatever it can to make a policy fit within that magic 6,144 character limit, but somethings that just can't be done. If you try to combine 30 different non-overlapping policies, there's a decent chance that the end result simply can't be shrunk enough. A careful reader might have noticed that all of the command examples specify an output "base" instead of a specific filename, and an output ``Foo`` ends up creating a file named ``Foo_1.json``. This is because in the case that Wonk can't pack everything into a separate file, it creates a **set** of as few output policies as possible to include all of the actions. The general process is this:
+Wonk does whatever it can to make a policy fit within that magic 6,144 character limit, but sometimes that just can't be done. If you try to combine 30 different non-overlapping policies, there's a decent chance that the end result simply can't be shrunk enough. A careful reader might have noticed that all of the command examples specify an output "base" instead of a specific filename, and an output ``Foo`` ends up creating a file named ``Foo_1.json``. This is because in the case that Wonk can't pack everything into a separate file, it creates a **set** of as few output policies as possible to include all of the actions. The general process is this:
 
 * Try to make everything fit.
 * If there are any statements with so many actions that they can't be shrunk into the size limit, split them up into equal-size chunks that do fit.
@@ -246,6 +246,9 @@ The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the ter
 
 History
 =======
+**0.5.5**
+  2022-05-10: Make multiple compression passes over statements.
+
 **0.5.4**
   2022-03-24: Upgrade ortools to 9.3.10497.
 
