@@ -35,7 +35,4 @@ def test_named_case(case_name, tmp_path):
         expected_output = json.loads(path.read_text())
         actual_output = json.loads((tmp_path / path.name).read_text())
 
-        expected_output.pop("Id")
-        actual_output.pop("Id")
-
         assert expected_output == actual_output

@@ -5,7 +5,7 @@ import json
 import math
 import pathlib
 import re
-import uuid
+from hashlib import sha256
 from typing import Dict, Generator, List, Tuple, Union
 
 from xdg import xdg_cache_home
@@ -111,7 +111,6 @@ def blank_policy() -> Policy:
 
     return {
         PolicyKey.VERSION: "2012-10-17",
-        PolicyKey.ID: uuid.uuid4().hex,
         PolicyKey.STATEMENT: [],
     }
 
@@ -279,13 +278,26 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
             if policies_are_identical(on_disk_policy, policy):
                 continue
 
-        output_path.write_text(packed_json(policy, MAX_MANAGED_POLICY_SIZE))
+        output_path.write_text(packed_json(policy_with_id(policy), MAX_MANAGED_POLICY_SIZE))
 
     # Delete all of the pre-existing files, minus the ones we visited above.
     for old in cleanup:
         old.unlink()
 
     return output_filenames
+
+
+def policy_with_id(policy: Policy) -> Policy:
+    """Return a copy of the Policy with the Id computed from the Policy's contents."""
+
+    policy = copy.deepcopy(policy)
+
+    statements = tiniest_json(policy[PolicyKey.STATEMENT])
+
+    digest = sha256(statements.encode()).hexdigest()[:32]
+    policy[PolicyKey.ID] = digest
+
+    return policy
 
 
 def policies_are_identical(old_policy: Policy, new_policy: Policy) -> bool:

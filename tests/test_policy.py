@@ -31,7 +31,9 @@ def test_write_policy_leaves_expected_results(tmp_path):
         (tmp_path / f"foo_bar_{i}.json").write_text('{"what": "fnord"}')
 
     written = policy.write_policy_set(
-        tmp_path, "foo", [{"foo": "something"}, {"bar": "something"}]
+        tmp_path,
+        "foo",
+        [{"Statement": {"foo": "something"}}, {"Statement": {"bar": "something"}}],
     )
 
     assert written == [f"{tmp_path}/foo_1.json", f"{tmp_path}/foo_2.json"]
@@ -51,13 +53,19 @@ def test_write_policy_leaves_expected_results(tmp_path):
     assert (tmp_path / "foo_1.json").read_text() == textwrap.dedent(
         """\
         {
-            "foo": "something"
+            "Id": "e4cd4ec6c23f8cf878f22c99b6edf909",
+            "Statement": {
+                "foo": "something"
+            }
         }"""
     )
     assert (tmp_path / "foo_2.json").read_text() == textwrap.dedent(
         """\
         {
-            "bar": "something"
+            "Id": "35fda171edeffab70d23db34d53e3f80",
+            "Statement": {
+                "bar": "something"
+            }
         }"""
     )
 
@@ -91,7 +99,6 @@ def test_policy_combine_small():
     assert len(policies) == 1
 
     new_policy = policies[0]
-    del new_policy["Id"]
     assert new_policy == {
         "Version": "2012-10-17",
         "Statement": [{"Action": "Dance!", "Resource": "Disco"}],
@@ -114,14 +121,10 @@ def test_policy_combine_big():
 
     new_policy_1, new_policy_2 = policies
 
-    del new_policy_1["Id"]
-
     assert new_policy_1 == {
         "Version": "2012-10-17",
         "Statement": [{"Action": ["a" * a_len, "c" * c_len], "NotResource": "spam"}],
     }
-
-    del new_policy_2["Id"]
 
     assert new_policy_2 == {
         "Version": "2012-10-17",
