@@ -288,7 +288,7 @@ def to_set(value: Union[str, List[str]]) -> Set[str]:
 
 
 def value_to_set(statement: Statement, key: str) -> Set[str]:
-    """Return the content's of the statements key as a (possibly empty) set of strings."""
+    """Return the contents of the statements key as a (possibly empty) set of strings."""
 
     try:
         value = statement[key]

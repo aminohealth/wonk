@@ -194,8 +194,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
         # that could be merged back together. The easiest way to handle this is to create a new
         # policy as-is, then group its statements together into *another* new, optimized policy,
         # and emit that one.
-        unmerged_policy = Policy()
-        unmerged_policy.statement = [json.loads(statement) for statement in statement_set]
+        unmerged_policy = Policy(statement=[json.loads(statement) for statement in statement_set])
         merged_policy = render(minify([unmerged_policy]))
         policies.append(merged_policy)
 
