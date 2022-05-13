@@ -173,7 +173,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
     # we could fit all n then we wouldn't have made it to this point in the program. And yes, this
     # is exactly the part of the program where we start caring about every byte.
     statements = new_policy.statement
-    minimum_possible_policy_size = len(Policy().tiniest_json())
+    minimum_possible_policy_size = len(Policy(statement=[]).tiniest_json())
     max_number_of_commas = len(statements) - 2
     max_statement_size = (
         MAX_MANAGED_POLICY_SIZE - minimum_possible_policy_size - max_number_of_commas

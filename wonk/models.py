@@ -3,7 +3,7 @@
 import copy
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass, field
 from hashlib import sha256
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -168,28 +168,14 @@ class InternalStatement:
         )
 
 
+@dataclass(frozen=True)
 class Policy:
     """Represent an AWS policy."""
 
-    version: str
-    id_: Optional[str]
-    statement: Any
-
     DEFAULT_ID = "*" * 32
 
-    def __init__(self, *, version=None, id=None, statement=None):
-        """Initialize a Policy object."""
-
-        self.version = "2012-10-17" if version is None else version
-        self.id_ = self.DEFAULT_ID if id is None else id
-        self.statement = [] if statement is None else statement
-
-    def __repr__(self) -> str:
-        """Return a string representation of the Policy."""
-
-        name = self.__class__.__name__
-
-        return f"{name}(version={self.version!r}, id={self.id!r}, statement={self.statement!r})"
+    statement: List[Statement]
+    version: str = field(default="2012-10-17")
 
     def __eq__(self, other) -> bool:
         """Return True if this Policy is identical to the other one."""
@@ -246,7 +232,6 @@ class Policy:
 
         return cls(
             version=data.pop(PolicyKey.VERSION, None),
-            id=data.pop(PolicyKey.ID, None),
             statement=data.pop(PolicyKey.STATEMENT, None),
         )
 
