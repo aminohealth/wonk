@@ -68,11 +68,12 @@ def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[Int
             existing_item = statement_sets[group]
         except KeyError:
             statement_sets[group] = statement
-        else:
-            new_action_value = existing_item.action_value | statement.action_value
-            if existing_item.action_value != new_action_value:
-                changed = True
-                existing_item.action_value = new_action_value
+            continue
+
+        new_action_value = existing_item.action_value | statement.action_value
+        if existing_item.action_value != new_action_value:
+            changed = True
+            statement_sets[group] = existing_item.replace(action_value=new_action_value)
 
     return changed, list(statement_sets.values())
 
@@ -93,13 +94,14 @@ def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[I
             existing_item = statement_sets[group]
         except KeyError:
             statement_sets[group] = statement
-        else:
-            new_resource_value = canonicalize_resources(
-                to_set(existing_item.resource_value) | to_set(statement.resource_value)
-            )
-            if existing_item.resource_value != new_resource_value:
-                changed = True
-                existing_item.resource_value = new_resource_value
+            continue
+
+        new_resource_value = canonicalize_resources(
+            to_set(existing_item.resource_value) | to_set(statement.resource_value)
+        )
+        if existing_item.resource_value != new_resource_value:
+            changed = True
+            statement_sets[group] = existing_item.replace(resource_value=new_resource_value)
 
     return changed, list(statement_sets.values())
 

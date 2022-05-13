@@ -3,6 +3,7 @@
 import copy
 import json
 import re
+from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -19,24 +20,56 @@ from .exceptions import UnshrinkablePolicyError
 Statement = Dict[str, Any]
 
 
+@dataclass(frozen=True)
 class InternalStatement:
     """An intermediate representation of an AWS policy statement."""
 
-    def __init__(self, statement: Statement):
-        """Convert an AWS statement into an internal representation that's easier to process."""
+    statement: Statement
 
-        statement = copy.deepcopy(statement)
-        statement.pop(StatementKey.SID, None)
+    @property
+    def action_key(self):
+        """Return whichever of the statement's Action or NotAction key is defined."""
 
-        self.action_key = which_type(statement, ACTION_KEYS)
-        self.action_value = value_to_set(statement, self.action_key)
-        statement.pop(self.action_key)
+        return which_type(self.statement, ACTION_KEYS)
 
-        self.resource_key = which_type(statement, RESOURCE_KEYS)
-        self.resource_value = canonicalize_resources(value_to_set(statement, self.resource_key))
-        statement.pop(self.resource_key)
+    @property
+    def action_value(self):
+        """Return the value of the statement's Action or NotAction key."""
 
-        self.rest = statement
+        return value_to_set(self.statement, self.action_key)
+
+    @property
+    def resource_key(self):
+        """Return whichever of the statement's Resource or NotResource key is defined."""
+
+        return which_type(self.statement, RESOURCE_KEYS)
+
+    @property
+    def resource_value(self):
+        """Return the value of the statement's Resource or NotResource key."""
+
+        return canonicalize_resources(value_to_set(self.statement, self.resource_key))
+
+    @property
+    def rest(self):
+        """Return everything but the statement's {Not,}Action, {Not,}Resource, and Sid keys."""
+
+        rest = copy.deepcopy(self.statement)
+        rest.pop(StatementKey.SID, None)
+        del rest[self.action_key]
+        del rest[self.resource_key]
+        return rest
+
+    def replace(self, *, action_value=None, resource_value=None):
+        """Return a copy of the statement with the given keys replaced."""
+
+        statement = copy.deepcopy(self.statement)
+        if action_value is not None:
+            statement[self.action_key] = action_value
+        if resource_value is not None:
+            statement[self.resource_key] = resource_value
+
+        return self.__class__(statement)
 
     def render(self) -> Statement:
         """Convert an internal statement into its AWS-ready representation."""
