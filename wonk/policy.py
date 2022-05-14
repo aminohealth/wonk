@@ -27,18 +27,7 @@ def minify(policies: List[Policy]) -> List[InternalStatement]:
 
     internal_statements: List[InternalStatement] = []
     for policy in policies:
-        # According to the policy language grammar (see
-        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
-        # Statement key should have a list of statements, and indeed that's almost always the case.
-        # Some of Amazon's own policies (see AWSCertificateManagerReadOnly) have a Statement key
-        # that points to a dict instead of a list of dicts. This ensures that we're always dealing
-        # with a list of statements.
-        statements = policy.statement
-        if isinstance(statements, dict):
-            statements = [statements]
-
-        for statement in statements:
-            internal_statements.append(InternalStatement(statement))
+        internal_statements.extend(policy.statements)
 
     this_changed = True
     while this_changed:
@@ -113,12 +102,7 @@ def render(statements: List[InternalStatement]) -> Policy:
     # the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to see if we're
     # actually updating a policy that we've written out, and if so, skip writing it again (with a
     # new `Id` key).
-    return Policy(
-        statement=[
-            statement.render()
-            for statement in sorted(statements, key=lambda obj: obj.sorting_key())
-        ]
-    )
+    return Policy(statements=sorted(statements, key=lambda obj: obj.sorting_key()))
 
 
 def tiniest_json(data: Statement) -> str:
@@ -172,18 +156,17 @@ def combine(policies: List[Policy]) -> List[Policy]:
     # and it's guaranteed that we can fit at most n-1 statements into a single document because if
     # we could fit all n then we wouldn't have made it to this point in the program. And yes, this
     # is exactly the part of the program where we start caring about every byte.
-    statements = new_policy.statement
-    minimum_possible_policy_size = len(Policy(statement=[]).tiniest_json())
-    max_number_of_commas = len(statements) - 2
+    minimum_possible_policy_size = len(Policy(statements=[]).tiniest_json())
+    max_number_of_commas = len(new_policy.statements) - 2
     max_statement_size = (
         MAX_MANAGED_POLICY_SIZE - minimum_possible_policy_size - max_number_of_commas
     )
 
     packed_list = []
-    for statement in statements:
-        packed = tiniest_json(statement)
+    for statement in new_policy.statements:
+        packed = statement.tiniest_json()
         if len(packed) > max_statement_size:
-            for splitted in split_statement(statement, max_statement_size):
+            for splitted in split_statement(statement.as_json(), max_statement_size):
                 packed_list.append(tiniest_json(splitted))
         else:
             packed_list.append(packed)
@@ -196,7 +179,9 @@ def combine(policies: List[Policy]) -> List[Policy]:
         # that could be merged back together. The easiest way to handle this is to create a new
         # policy as-is, then group its statements together into *another* new, optimized policy,
         # and emit that one.
-        unmerged_policy = Policy(statement=[json.loads(statement) for statement in statement_set])
+        unmerged_policy = Policy(
+            statements=[InternalStatement(json.loads(statement)) for statement in statement_set]
+        )
         merged_policy = render(minify([unmerged_policy]))
         policies.append(merged_policy)
 

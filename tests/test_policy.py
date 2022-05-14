@@ -5,7 +5,7 @@ import textwrap
 import pytest
 
 from wonk import exceptions, policy
-from wonk.models import Policy
+from wonk.models import InternalStatement, Policy
 
 
 def test_write_policy_set_doesnt_run_amok(tmp_path):
@@ -19,7 +19,10 @@ def test_write_policy_set_doesnt_run_amok(tmp_path):
         policy.write_policy_set(
             tmp_path,
             "foo",
-            [Policy(statement={"foo": "something"}), Policy(statement={"bar": "something"})],
+            [
+                Policy(statements=[InternalStatement({"foo": "something"})]),
+                Policy(statements=[InternalStatement({"bar": "something"})]),
+            ],
         )
 
     assert exc.value.policy_set == "foo"
@@ -37,7 +40,14 @@ def test_write_policy_leaves_expected_results(tmp_path):
     written = policy.write_policy_set(
         tmp_path,
         "foo",
-        [Policy(statement={"foo": "something"}), Policy(statement={"bar": "something"})],
+        [
+            Policy(statements=[InternalStatement({"Action": "do", "Resource": "something"})]),
+            Policy(
+                statements=[
+                    InternalStatement({"Action": "ignore", "NotResource": "another something"})
+                ]
+            ),
+        ],
     )
 
     assert written == [f"{tmp_path}/foo_1.json", f"{tmp_path}/foo_2.json"]
@@ -58,20 +68,26 @@ def test_write_policy_leaves_expected_results(tmp_path):
         """\
         {
             "Version": "2012-10-17",
-            "Id": "1161c90d42eab499ee1929f669bc9fe9",
-            "Statement": {
-                "foo": "something"
-            }
+            "Id": "20feeba11f0d5a5d4f3f88f590c3a6e9",
+            "Statement": [
+                {
+                    "Action": "do",
+                    "Resource": "something"
+                }
+            ]
         }"""
     )
     assert (tmp_path / "foo_2.json").read_text() == textwrap.dedent(
         """\
         {
             "Version": "2012-10-17",
-            "Id": "be9d9ca35c42b85ce6ba7a8229624995",
-            "Statement": {
-                "bar": "something"
-            }
+            "Id": "bd4d3789ad19090802df8fc64ac7ae28",
+            "Statement": [
+                {
+                    "Action": "ignore",
+                    "NotResource": "another something"
+                }
+            ]
         }"""
     )
 
@@ -100,13 +116,16 @@ def test_fetch_retrieves_policy(mocker):
 def test_policy_combine_small():
     """Combining one small policy does as expected."""
 
-    policies = policy.combine([Policy(statement=[{"Action": "Dance!", "Resource": ["Disco"]}])])
+    policies = policy.combine(
+        [Policy(statements=[InternalStatement({"Action": "Dance!", "Resource": ["Disco"]})])]
+    )
 
     assert len(policies) == 1
 
     new_policy = policies[0]
     assert new_policy == Policy(
-        version="2012-10-17", statement=[{"Action": "Dance!", "Resource": "Disco"}]
+        version="2012-10-17",
+        statements=[InternalStatement({"Action": "Dance!", "Resource": "Disco"})],
     )
 
 
@@ -118,7 +137,7 @@ def test_policy_combine_big():
     c_len = int(policy.MAX_MANAGED_POLICY_SIZE * 0.4)
 
     old_policies = [
-        Policy(statement=[{"Action": [char * length], "NotResource": "spam"}])
+        Policy(statements=[InternalStatement({"Action": [char * length], "NotResource": "spam"})])
         for char, length in [("a", a_len), ("b", b_len), ("c", c_len)]
     ]
 
@@ -128,11 +147,14 @@ def test_policy_combine_big():
 
     assert new_policy_1 == Policy(
         version="2012-10-17",
-        statement=[{"Action": ["a" * a_len, "c" * c_len], "NotResource": "spam"}],
+        statements=[
+            InternalStatement({"Action": ["a" * a_len, "c" * c_len], "NotResource": "spam"})
+        ],
     )
 
     assert new_policy_2 == Policy(
-        version="2012-10-17", statement=[{"Action": "b" * b_len, "NotResource": "spam"}]
+        version="2012-10-17",
+        statements=[InternalStatement({"Action": "b" * b_len, "NotResource": "spam"})],
     )
 
 
@@ -173,7 +195,7 @@ def test_grouped_actions():
     changed, statements = policy.grouped_actions([policy1, policy2])
     assert changed
     assert len(statements) == 1
-    assert statements[0].render() == {
+    assert statements[0].as_json() == {
         "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
         "Resource": "*",
         "Effect": "Allow",
@@ -204,7 +226,7 @@ def test_grouped_actions_same_resources():
     changed, statements = policy.grouped_actions([policy1, policy2])
     assert changed
     assert len(statements) == 1
-    assert statements[0].render() == {
+    assert statements[0].as_json() == {
         "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
         "Resource": ["bacon", "eggs", "spam"],
         "Effect": "Allow",
@@ -236,13 +258,13 @@ def test_grouped_actions_different_resources():
     assert not changed
     assert len(statements) == 2
 
-    assert statements[0].render() == {
+    assert statements[0].as_json() == {
         "Action": ["SVC:Action1", "SVC:Action2"],
         "Effect": "Allow",
         "Resource": ["bacon", "spam"],
     }
 
-    assert statements[1].render() == {
+    assert statements[1].as_json() == {
         "Action": ["SVC:Action2", "SVC:Action3"],
         "Effect": "Allow",
         "Resource": ["eggs", "spam"],
@@ -274,13 +296,13 @@ def test_grouped_actions_notresources():
     assert not changed
     assert len(statements) == 2
 
-    assert statements[0].render() == {
+    assert statements[0].as_json() == {
         "Action": ["SVC:Action1", "SVC:Action2"],
         "Effect": "Allow",
         "Resource": ["bacon", "eggs", "spam"],
     }
 
-    assert statements[1].render() == {
+    assert statements[1].as_json() == {
         "Action": ["SVC:Action2", "SVC:Action3"],
         "Effect": "Allow",
         "NotResource": ["bacon", "eggs", "spam"],
@@ -311,7 +333,7 @@ def test_grouped_resources():
     changed, statements = policy.grouped_resources([policy1, policy2])
     assert changed
     assert len(statements) == 1
-    assert statements[0].render() == {
+    assert statements[0].as_json() == {
         "Action": ["SVC:Action1", "SVC:Action2"],
         "Resource": ["bar", "baz", "foo"],
         "Effect": "Allow",
@@ -343,13 +365,13 @@ def test_grouped_resources_different_actions():
     assert not changed
     assert len(statements) == 2
 
-    assert statements[0].render() == {
+    assert statements[0].as_json() == {
         "Action": ["SVC:Action1", "SVC:Action2"],
         "Effect": "Allow",
         "Resource": ["bacon", "spam"],
     }
 
-    assert statements[1].render() == {
+    assert statements[1].as_json() == {
         "Action": ["SVC:Action2", "SVC:Action3"],
         "Effect": "Allow",
         "Resource": ["eggs", "spam"],
@@ -381,13 +403,13 @@ def test_grouped_resources_notactions():
     assert not changed
     assert len(statements) == 2
 
-    assert statements[0].render() == {
+    assert statements[0].as_json() == {
         "Action": ["SVC:Action1", "SVC:Action2"],
         "Effect": "Allow",
         "Resource": ["bacon", "eggs", "spam"],
     }
 
-    assert statements[1].render() == {
+    assert statements[1].as_json() == {
         "NotAction": ["SVC:Action1", "SVC:Action2"],
         "Effect": "Allow",
         "Resource": ["bacon", "eggs", "spam"],
@@ -428,21 +450,27 @@ def test_render():
     #    rendered.pop("Id", None)
 
     assert rendered == Policy(
-        statement=[
-            {
-                "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
-                "Effect": "Allow",
-                "Resource": "*",
-            },
-            {
-                "Action": ["SVC:BadAction1", "SVC:BadAction4"],
-                "Effect": "Deny",
-                "Resource": "*",
-            },
-            {
-                "Effect": "Allow",
-                "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
-                "Resource": "*",
-            },
+        statements=[
+            InternalStatement(
+                {
+                    "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
+                    "Effect": "Allow",
+                    "Resource": "*",
+                }
+            ),
+            InternalStatement(
+                {
+                    "Action": ["SVC:BadAction1", "SVC:BadAction4"],
+                    "Effect": "Deny",
+                    "Resource": "*",
+                }
+            ),
+            InternalStatement(
+                {
+                    "Effect": "Allow",
+                    "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
+                    "Resource": "*",
+                }
+            ),
         ]
     )

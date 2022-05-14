@@ -71,7 +71,7 @@ class InternalStatement:
 
         return self.__class__(statement)
 
-    def render(self) -> Statement:
+    def as_json(self) -> Statement:
         """Convert an internal statement into its AWS-ready representation."""
 
         statement = copy.deepcopy(self.rest)
@@ -80,6 +80,10 @@ class InternalStatement:
         statement[self.resource_key] = self.resource_value
 
         return statement
+
+    def tiniest_json(self) -> str:
+        """Return the smallest representation of the data."""
+        return json.dumps(self.as_json(), sort_keys=True, **JSON_ARGS[-1])
 
     def grouping_for_actions(self) -> str:
         """Make a key that can be used to group this statement's actions with others like it.
@@ -174,17 +178,25 @@ class Policy:
 
     DEFAULT_ID = "*" * 32
 
-    statement: List[Statement]
+    statements: List[InternalStatement]
     version: str = field(default="2012-10-17")
+
+    def __post_init__(self):
+        # According to the policy language grammar (see
+        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
+        # Statement key should have a list of statements, and indeed that's almost always the case.
+        # Some of Amazon's own policies (see AWSCertificateManagerReadOnly) have a Statement key
+        # that points to a dict instead of a list of dicts. This ensures that we're always dealing
+        # with a list of statements.
+        if isinstance(self.statements, dict):
+            self.__setattr__("statements", [self.statements])
+
+    #        self.statements.sort(key=lambda statement: statement.sorting_key())
 
     def __eq__(self, other) -> bool:
         """Return True if this Policy is identical to the other one."""
 
-        return (
-            self.version == other.version
-            and self.id == other.id
-            and self.statement == other.statement
-        )
+        return self.as_json() == other.as_json()
 
     def as_json(self) -> Dict[str, Any]:
         """Represent the Policy as a JSON object."""
@@ -192,7 +204,7 @@ class Policy:
         return {
             PolicyKey.VERSION: self.version,
             PolicyKey.ID: self.id,
-            PolicyKey.STATEMENT: self.statement,
+            PolicyKey.STATEMENT: [statement.as_json() for statement in self.statements],
         }
 
     def render(self) -> str:
@@ -214,7 +226,7 @@ class Policy:
         data = {
             PolicyKey.VERSION: self.version,
             PolicyKey.ID: self.DEFAULT_ID,  # Don't compute the Policy's ID just for this.
-            PolicyKey.STATEMENT: self.statement,
+            PolicyKey.STATEMENT: [statement.as_json() for statement in self.statements],
         }
 
         return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
@@ -232,7 +244,9 @@ class Policy:
 
         return cls(
             version=data.pop(PolicyKey.VERSION, None),
-            statement=data.pop(PolicyKey.STATEMENT, None),
+            statements=[
+                InternalStatement(statement) for statement in data.get(PolicyKey.STATEMENT, [])
+            ],
         )
 
 
