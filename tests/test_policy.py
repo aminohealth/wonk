@@ -20,8 +20,14 @@ def test_write_policy_set_doesnt_run_amok(tmp_path):
             tmp_path,
             "foo",
             [
-                Policy(statements=[InternalStatement({"foo": "something"})]),
-                Policy(statements=[InternalStatement({"bar": "something"})]),
+                Policy(
+                    statements=[InternalStatement({"Action": "something", "Resource": "spam"})]
+                ),
+                Policy(
+                    statements=[
+                        InternalStatement({"Action": "another something", "Resource": "eggs"})
+                    ]
+                ),
             ],
         )
 
@@ -414,63 +420,3 @@ def test_grouped_resources_notactions():
         "Effect": "Allow",
         "Resource": ["bacon", "eggs", "spam"],
     }
-
-
-def test_render():
-    """A rendered policy looks like we'd expect it to."""
-
-    # This should be output last because it's just some random statement.
-    statement_1 = policy.InternalStatement(
-        {
-            "Effect": "Deny",
-            "Action": {"SVC:BadAction1", "SVC:BadAction4"},
-            "Resource": "*",
-        }
-    )
-
-    # This should be output second because it's the NotAction version of the minimal statement.
-    statement_2 = policy.InternalStatement(
-        {
-            "Effect": "Allow",
-            "NotAction": {"SVC:OtherAction1", "SVC:OtherAction5"},
-            "Resource": "*",
-        }
-    )
-
-    # This should be output first because it's the minimal statement.
-    statement_3 = policy.InternalStatement(
-        {
-            "Effect": "Allow",
-            "Action": {"SVC:Action1", "SVC:Action2", "SVC:Action3"},
-            "Resource": "*",
-        }
-    )
-
-    rendered = policy.render([statement_1, statement_2, statement_3])
-    #    rendered.pop("Id", None)
-
-    assert rendered == Policy(
-        statements=[
-            InternalStatement(
-                {
-                    "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
-                    "Effect": "Allow",
-                    "Resource": "*",
-                }
-            ),
-            InternalStatement(
-                {
-                    "Action": ["SVC:BadAction1", "SVC:BadAction4"],
-                    "Effect": "Deny",
-                    "Resource": "*",
-                }
-            ),
-            InternalStatement(
-                {
-                    "Effect": "Allow",
-                    "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
-                    "Resource": "*",
-                }
-            ),
-        ]
-    )

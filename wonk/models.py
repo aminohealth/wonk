@@ -191,7 +191,11 @@ class Policy:
         if isinstance(self.statements, dict):
             self.__setattr__("statements", [self.statements])
 
-    #        self.statements.sort(key=lambda statement: statement.sorting_key())
+        # Sort everything that can be sorted. This ensures that separate runs of the program
+        # generate the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to
+        # see if we're actually updating a policy that we've written out, and if so, skip writing
+        # it again (with a new `Id` key).
+        self.statements.sort(key=lambda statement: statement.sorting_key())
 
     def __eq__(self, other) -> bool:
         """Return True if this Policy is identical to the other one."""

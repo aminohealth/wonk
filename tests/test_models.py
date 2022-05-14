@@ -238,3 +238,62 @@ def test_sorting_key_sorts_correctly():
         statement1,
         statement2,
     ]
+
+
+def test_policy_render():
+    """A rendered policy looks like we'd expect it to."""
+
+    # This should be output last because it's just some random statement.
+    statement_1 = models.InternalStatement(
+        {
+            "Effect": "Deny",
+            "Action": {"SVC:BadAction1", "SVC:BadAction4"},
+            "Resource": "*",
+        }
+    )
+
+    # This should be output second because it's the NotAction version of the minimal statement.
+    statement_2 = models.InternalStatement(
+        {
+            "Effect": "Allow",
+            "NotAction": {"SVC:OtherAction1", "SVC:OtherAction5"},
+            "Resource": "*",
+        }
+    )
+
+    # This should be output first because it's the minimal statement.
+    statement_3 = models.InternalStatement(
+        {
+            "Effect": "Allow",
+            "Action": {"SVC:Action1", "SVC:Action2", "SVC:Action3"},
+            "Resource": "*",
+        }
+    )
+
+    rendered = models.Policy(statements=[statement_1, statement_2, statement_3])
+
+    assert rendered == models.Policy(
+        statements=[
+            models.InternalStatement(
+                {
+                    "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
+                    "Effect": "Allow",
+                    "Resource": "*",
+                }
+            ),
+            models.InternalStatement(
+                {
+                    "Action": ["SVC:BadAction1", "SVC:BadAction4"],
+                    "Effect": "Deny",
+                    "Resource": "*",
+                }
+            ),
+            models.InternalStatement(
+                {
+                    "Effect": "Allow",
+                    "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
+                    "Resource": "*",
+                }
+            ),
+        ]
+    )

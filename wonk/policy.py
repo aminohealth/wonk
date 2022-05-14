@@ -95,16 +95,6 @@ def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[I
     return changed, list(statement_sets.values())
 
 
-def render(statements: List[InternalStatement]) -> Policy:
-    """Turn the contents of the statement sets into a valid AWS policy."""
-
-    # Sort everything that can be sorted. This ensures that separate runs of the program generate
-    # the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to see if we're
-    # actually updating a policy that we've written out, and if so, skip writing it again (with a
-    # new `Id` key).
-    return Policy(statements=sorted(statements, key=lambda obj: obj.sorting_key()))
-
-
 def tiniest_json(data: Statement) -> str:
     """Return the smallest representation of the data."""
     return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
@@ -137,7 +127,7 @@ def split_statement(
 def combine(policies: List[Policy]) -> List[Policy]:
     """Combine policy files into the smallest possible set of outputs."""
 
-    new_policy = render(minify(policies))
+    new_policy = Policy(statements=minify(policies))
 
     # Simplest case: we're able to squeeze everything into a single file. This is the ideal.
     try:
@@ -182,7 +172,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
         unmerged_policy = Policy(
             statements=[InternalStatement(json.loads(statement)) for statement in statement_set]
         )
-        merged_policy = render(minify([unmerged_policy]))
+        merged_policy = Policy(statements=minify([unmerged_policy]))
         policies.append(merged_policy)
 
     return policies
