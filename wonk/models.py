@@ -2,10 +2,11 @@
 
 import copy
 import json
+import math
 import re
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from hashlib import sha256
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Generator, List, Set, Tuple, Union
 
 from .constants import (
     ACTION_KEYS,
@@ -171,6 +172,28 @@ class InternalStatement:
             sorted(self.action_value),
         )
 
+    def split_statement(self, max_statement_size: int) -> Generator[Statement, None, None]:
+        """Split the original statement into a series of chunks that are below the size limit."""
+
+        statement_action = self.action_key
+        actions = sorted(self.action_value)
+
+        # Why .45? If we need to break a statement up, we may as well make the resulting parts
+        # small enough that the solver can easily pack them with others. A bad outcome here would
+        # be to end up with 20 statements that were each 60% of the maximum size so that no two
+        # could be packed together. However, there _is_ a little bit of overhead in splitting them
+        # because each statement is wrapped in a dict that may have several keys in it. In the end,
+        # "a little smaller than half the maximum" seemed about right.
+
+        chunks = math.ceil(len(self.tiniest_json()) / (max_statement_size * 0.45))
+        chunk_size = math.ceil(len(actions) / chunks)
+
+        for base in range(0, len(actions), chunk_size):
+            sub_statement = self.rest
+            sub_statement[self.resource_key] = self.resource_value
+            sub_statement[statement_action] = actions[base : base + chunk_size]  # noqa: E203
+            yield sub_statement
+
 
 @dataclass(frozen=True)
 class Policy:
@@ -182,6 +205,8 @@ class Policy:
     version: str = field(default="2012-10-17")
 
     def __post_init__(self):
+        """Clean up passed-in values."""
+
         # According to the policy language grammar (see
         # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
         # Statement key should have a list of statements, and indeed that's almost always the case.
@@ -195,7 +220,7 @@ class Policy:
         # generate the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to
         # see if we're actually updating a policy that we've written out, and if so, skip writing
         # it again (with a new `Id` key).
-        self.statements.sort(key=lambda statement: statement.sorting_key())
+        self.statements.sort(key=InternalStatement.sorting_key)
 
     def __eq__(self, other) -> bool:
         """Return True if this Policy is identical to the other one."""

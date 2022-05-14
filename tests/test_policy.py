@@ -164,19 +164,6 @@ def test_policy_combine_big():
     )
 
 
-def test_split_statement():
-    """Statements are correctly split into smaller chunks."""
-
-    splitted = policy.split_statement(
-        {"Action": ["a"] * 45 + ["b"] * 30 + ["c"] * 30 + ["d"] * 15}, 300
-    )
-
-    assert next(splitted) == {"Action": ["a"] * 30}
-    assert next(splitted) == {"Action": ["a"] * 15 + ["b"] * 15}
-    assert next(splitted) == {"Action": ["b"] * 15 + ["c"] * 15}
-    assert next(splitted) == {"Action": ["c"] * 15 + ["d"] * 15}
-
-
 def test_grouped_actions():
     """Simple statements are grouped as expected, even if their resources are written oddly."""
 

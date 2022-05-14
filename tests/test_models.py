@@ -1,5 +1,7 @@
 """Test the wonk.models module."""
 
+from string import ascii_lowercase
+
 import pytest
 
 from wonk import models
@@ -297,3 +299,24 @@ def test_policy_render():
             ),
         ]
     )
+
+
+def test_split_statement():
+    """Statements are correctly split into smaller chunks."""
+
+    splitted = models.InternalStatement(
+        {"Action": list(ascii_lowercase), "Resource": "foo"}
+    ).split_statement(100)
+
+    assert next(splitted) == {
+        "Action": ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+        "Resource": "foo",
+    }
+    assert next(splitted) == {
+        "Action": ["j", "k", "l", "m", "n", "o", "p", "q", "r"],
+        "Resource": "foo",
+    }
+    assert next(splitted) == {
+        "Action": ["s", "t", "u", "v", "w", "x", "y", "z"],
+        "Resource": "foo",
+    }

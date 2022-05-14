@@ -1,23 +1,15 @@
 """Manage AWS policies."""
 
 import json
-import math
 import pathlib
 import re
-from typing import Dict, Generator, List, Tuple
+from typing import Dict, List, Tuple
 
 from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
-from wonk.constants import ACTION_KEYS, JSON_ARGS, MAX_MANAGED_POLICY_SIZE
-from wonk.models import (
-    InternalStatement,
-    Policy,
-    Statement,
-    canonicalize_resources,
-    to_set,
-    which_type,
-)
+from wonk.constants import JSON_ARGS, MAX_MANAGED_POLICY_SIZE
+from wonk.models import InternalStatement, Policy, Statement, canonicalize_resources, to_set
 
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
@@ -100,30 +92,6 @@ def tiniest_json(data: Statement) -> str:
     return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
 
 
-def split_statement(
-    statement: Statement, max_statement_size: int
-) -> Generator[Statement, None, None]:
-    """Split the original statement into a series of chunks that are below the size limit."""
-
-    statement_action = which_type(statement, ACTION_KEYS)
-    actions = statement[statement_action]
-
-    # Why .45? If we need to break a statement up, we may as well make the resulting parts small
-    # enough that the solver can easily pack them with others. A bad outcome here would be to end
-    # up with 20 statements that were each 60% of the maximum size so that no two could be packed
-    # together. However, there _is_ a little bit of overhead in splitting them because each
-    # statement is wrapped in a dict that may have several keys in it. In the end, "a little
-    # smaller than half the maximum" seemed about right.
-
-    chunks = math.ceil(len(tiniest_json(statement)) / (max_statement_size * 0.45))
-    chunk_size = math.ceil(len(actions) / chunks)
-
-    for base in range(0, len(actions), chunk_size):
-        sub_statement = {key: value for key, value in statement.items() if key != statement_action}
-        sub_statement[statement_action] = actions[base : base + chunk_size]  # noqa: E203
-        yield sub_statement
-
-
 def combine(policies: List[Policy]) -> List[Policy]:
     """Combine policy files into the smallest possible set of outputs."""
 
@@ -156,7 +124,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
     for statement in new_policy.statements:
         packed = statement.tiniest_json()
         if len(packed) > max_statement_size:
-            for splitted in split_statement(statement.as_json(), max_statement_size):
+            for splitted in statement.split_statement(max_statement_size):
                 packed_list.append(tiniest_json(splitted))
         else:
             packed_list.append(packed)
