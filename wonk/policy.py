@@ -174,6 +174,11 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
         # the plug and refuse to delete them.
         raise exceptions.TooManyPoliciesError(base_name, len(cleanup))
 
+    # For consistency, delete all of the pre-existing files before we start so we can't be left
+    # with a mix of old and new files.
+    for old in cleanup:
+        old.unlink()
+
     # Write each of the files that file go into this policy set, and create a list of the filenames
     # we've written.
     output_filenames = []
@@ -181,27 +186,7 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
         output_path = output_dir / f"{base_name}_{i}.json"
         output_filenames.append(str(output_path))
 
-        # Don't delete a file right after we create it.
-        cleanup.discard(output_path)
-
-        # Check if the on-disk file is identical to this one. If so, leave it alone so that we
-        # don't have unnecessary churn in Git, Terraform, etc.
-        #
-        # We minimize churn by sorting collections whenever possible so that they're always output
-        # in the same order if the original filenames change.
-        try:
-            on_disk_policy = json.loads(output_path.read_text())
-        except FileNotFoundError:
-            pass
-        else:
-            if policy == Policy.from_dict(on_disk_policy):
-                continue
-
         output_path.write_text(policy.render())
-
-    # Delete all of the pre-existing files, minus the ones we visited above.
-    for old in cleanup:
-        old.unlink()
 
     return output_filenames
 
