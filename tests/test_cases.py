@@ -5,7 +5,7 @@ import pathlib
 
 import pytest
 
-from wonk import models, policy
+from wonk import cli, policy
 
 # Get the path to the "cases" directory that lives next to this module
 CASE_BASE = pathlib.Path(__file__).parent / "cases"
@@ -23,7 +23,7 @@ def test_named_case(case_name, tmp_path):
     input_paths = (test_base / "inputs").glob("*.json")
     assert input_paths
 
-    inputs = [models.Policy.from_dict(json.loads(path.read_text())) for path in input_paths]
+    inputs = cli.policies_from_filenames(input_paths)
     combined = policy.combine(inputs)
 
     policy.write_policy_set(tmp_path, "output", combined)
