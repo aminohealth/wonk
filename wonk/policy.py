@@ -8,8 +8,8 @@ from typing import Dict, List, Tuple
 from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
-from wonk.constants import JSON_ARGS, MAX_MANAGED_POLICY_SIZE
-from wonk.models import Policy, Statement, StatementData, canonicalize_resources, to_set
+from wonk.constants import MAX_MANAGED_POLICY_SIZE
+from wonk.models import Policy, Statement, canonicalize_resources, smallest_json, to_set
 
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
@@ -87,11 +87,6 @@ def grouped_resources(statements: List[Statement]) -> Tuple[bool, List[Statement
     return changed, list(statement_sets.values())
 
 
-def tiniest_json(data: StatementData) -> str:
-    """Return the smallest representation of the data."""
-    return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
-
-
 def combine(policies: List[Policy]) -> List[Policy]:
     """Combine policy files into the smallest possible set of outputs."""
 
@@ -114,7 +109,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
     # and it's guaranteed that we can fit at most n-1 statements into a single document because if
     # we could fit all n then we wouldn't have made it to this point in the program. And yes, this
     # is exactly the part of the program where we start caring about every byte.
-    minimum_possible_policy_size = len(Policy(statements=[]).tiniest_json())
+    minimum_possible_policy_size = len(str(Policy(statements=[])))
     max_number_of_commas = len(new_policy.statements) - 2
     max_statement_size = (
         MAX_MANAGED_POLICY_SIZE - minimum_possible_policy_size - max_number_of_commas
@@ -122,12 +117,13 @@ def combine(policies: List[Policy]) -> List[Policy]:
 
     packed_list = []
     for statement in new_policy.statements:
-        packed = statement.tiniest_json()
-        if len(packed) > max_statement_size:
-            for splitted in statement.split(max_statement_size):
-                packed_list.append(tiniest_json(splitted))
-        else:
+        packed = str(statement)
+        if len(packed) <= max_statement_size:
             packed_list.append(packed)
+            continue
+
+        for statement_dict in statement.split(max_statement_size):
+            packed_list.append(smallest_json(statement_dict))
 
     statement_sets = optimizer.pack_statements(packed_list, max_statement_size, 10)
 

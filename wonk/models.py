@@ -27,6 +27,11 @@ class Statement:
 
     statement: StatementData
 
+    def __str__(self) -> str:
+        """Return the smallest representation of the Statement."""
+
+        return smallest_json(self.as_json())
+
     @property
     def action_key(self):
         """Return whichever of the statement's Action or NotAction key is defined."""
@@ -81,10 +86,6 @@ class Statement:
         statement[self.resource_key] = self.resource_value
 
         return statement
-
-    def tiniest_json(self) -> str:
-        """Return the smallest representation of the data."""
-        return json.dumps(self.as_json(), sort_keys=True, **JSON_ARGS[-1])
 
     def grouping_for_actions(self) -> str:
         """Make a key that can be used to group this statement's actions with others like it.
@@ -185,7 +186,7 @@ class Statement:
         # because each statement is wrapped in a dict that may have several keys in it. In the end,
         # "a little smaller than half the maximum" seemed about right.
 
-        chunks = math.ceil(len(self.tiniest_json()) / (max_statement_size * 0.45))
+        chunks = math.ceil(len(str(self)) / (max_statement_size * 0.45))
         chunk_size = math.ceil(len(actions) / chunks)
 
         for base in range(0, len(actions), chunk_size):
@@ -220,6 +221,17 @@ class Policy:
         # generate the same outputs, which makes `git diff` happy.
         self.statements.sort(key=Statement.sorting_key)
 
+    def __str__(self) -> str:
+        """Return the smallest possible JSON representation of the Policy."""
+
+        return smallest_json(
+            {
+                PolicyKey.VERSION: self.version,
+                PolicyKey.ID: self.DEFAULT_ID,  # Don't compute the Policy's ID just for this.
+                PolicyKey.STATEMENT: [statement.as_json() for statement in self.statements],
+            }
+        )
+
     def __eq__(self, other) -> bool:
         """Return True if this Policy is identical to the other one."""
 
@@ -247,22 +259,11 @@ class Policy:
             f"Unable to shrink the data into into {MAX_MANAGED_POLICY_SIZE} characters: {data!r}"
         )
 
-    def tiniest_json(self) -> str:
-        """Return the smallest possible JSON representation of the object."""
-
-        data = {
-            PolicyKey.VERSION: self.version,
-            PolicyKey.ID: self.DEFAULT_ID,  # Don't compute the Policy's ID just for this.
-            PolicyKey.STATEMENT: [statement.as_json() for statement in self.statements],
-        }
-
-        return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
-
     @property
     def id(self) -> str:
         """Return the Policy's ID as a hash of its contents."""
 
-        digest = sha256(self.tiniest_json().encode()).hexdigest()
+        digest = sha256(str(self).encode()).hexdigest()
         return digest[: len(self.DEFAULT_ID)]
 
     @classmethod
@@ -273,6 +274,12 @@ class Policy:
             version=data.pop(PolicyKey.VERSION, None),
             statements=[Statement(statement) for statement in data.get(PolicyKey.STATEMENT, [])],
         )
+
+
+def smallest_json(data: dict) -> str:
+    """Return the smallest possible JSON representation of the dict."""
+
+    return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
 
 
 def deduped_items(items: Set[str]) -> List[str]:
