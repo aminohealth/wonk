@@ -5,7 +5,7 @@ import textwrap
 import pytest
 
 from wonk import exceptions, policy
-from wonk.models import InternalStatement, Policy
+from wonk.models import Policy, Statement
 
 
 def test_write_policy_set_doesnt_run_amok(tmp_path):
@@ -20,13 +20,9 @@ def test_write_policy_set_doesnt_run_amok(tmp_path):
             tmp_path,
             "foo",
             [
+                Policy(statements=[Statement({"Action": "something", "Resource": "spam"})]),
                 Policy(
-                    statements=[InternalStatement({"Action": "something", "Resource": "spam"})]
-                ),
-                Policy(
-                    statements=[
-                        InternalStatement({"Action": "another something", "Resource": "eggs"})
-                    ]
+                    statements=[Statement({"Action": "another something", "Resource": "eggs"})]
                 ),
             ],
         )
@@ -47,11 +43,9 @@ def test_write_policy_leaves_expected_results(tmp_path):
         tmp_path,
         "foo",
         [
-            Policy(statements=[InternalStatement({"Action": "do", "Resource": "something"})]),
+            Policy(statements=[Statement({"Action": "do", "Resource": "something"})]),
             Policy(
-                statements=[
-                    InternalStatement({"Action": "ignore", "NotResource": "another something"})
-                ]
+                statements=[Statement({"Action": "ignore", "NotResource": "another something"})]
             ),
         ],
     )
@@ -123,7 +117,7 @@ def test_policy_combine_small():
     """Combining one small policy does as expected."""
 
     policies = policy.combine(
-        [Policy(statements=[InternalStatement({"Action": "Dance!", "Resource": ["Disco"]})])]
+        [Policy(statements=[Statement({"Action": "Dance!", "Resource": ["Disco"]})])]
     )
 
     assert len(policies) == 1
@@ -131,7 +125,7 @@ def test_policy_combine_small():
     new_policy = policies[0]
     assert new_policy == Policy(
         version="2012-10-17",
-        statements=[InternalStatement({"Action": "Dance!", "Resource": "Disco"})],
+        statements=[Statement({"Action": "Dance!", "Resource": "Disco"})],
     )
 
 
@@ -143,7 +137,7 @@ def test_policy_combine_big():
     c_len = int(policy.MAX_MANAGED_POLICY_SIZE * 0.4)
 
     old_policies = [
-        Policy(statements=[InternalStatement({"Action": [char * length], "NotResource": "spam"})])
+        Policy(statements=[Statement({"Action": [char * length], "NotResource": "spam"})])
         for char, length in [("a", a_len), ("b", b_len), ("c", c_len)]
     ]
 
@@ -153,21 +147,19 @@ def test_policy_combine_big():
 
     assert new_policy_1 == Policy(
         version="2012-10-17",
-        statements=[
-            InternalStatement({"Action": ["a" * a_len, "c" * c_len], "NotResource": "spam"})
-        ],
+        statements=[Statement({"Action": ["a" * a_len, "c" * c_len], "NotResource": "spam"})],
     )
 
     assert new_policy_2 == Policy(
         version="2012-10-17",
-        statements=[InternalStatement({"Action": "b" * b_len, "NotResource": "spam"})],
+        statements=[Statement({"Action": "b" * b_len, "NotResource": "spam"})],
     )
 
 
 def test_grouped_actions():
     """Simple statements are grouped as expected, even if their resources are written oddly."""
 
-    policy1 = policy.InternalStatement(
+    policy1 = policy.Statement(
         {
             "Sid": "El",
             "Effect": "Allow",
@@ -176,7 +168,7 @@ def test_grouped_actions():
         }
     )
 
-    policy2 = policy.InternalStatement(
+    policy2 = policy.Statement(
         {
             "Sid": "Knee",
             "Effect": "Allow",
@@ -198,7 +190,7 @@ def test_grouped_actions():
 def test_grouped_actions_same_resources():
     """Simple statements with the same resources are grouped together."""
 
-    policy1 = policy.InternalStatement(
+    policy1 = policy.Statement(
         {
             "Sid": "El",
             "Effect": "Allow",
@@ -207,7 +199,7 @@ def test_grouped_actions_same_resources():
         }
     )
 
-    policy2 = policy.InternalStatement(
+    policy2 = policy.Statement(
         {
             "Sid": "Knee",
             "Effect": "Allow",
@@ -229,7 +221,7 @@ def test_grouped_actions_same_resources():
 def test_grouped_actions_different_resources():
     """Statements with different resources don't get grouped together."""
 
-    policy1 = policy.InternalStatement(
+    policy1 = policy.Statement(
         {
             "Sid": "El",
             "Effect": "Allow",
@@ -238,7 +230,7 @@ def test_grouped_actions_different_resources():
         }
     )
 
-    policy2 = policy.InternalStatement(
+    policy2 = policy.Statement(
         {
             "Sid": "Knee",
             "Effect": "Allow",
@@ -267,7 +259,7 @@ def test_grouped_actions_different_resources():
 def test_grouped_actions_notresources():
     """Statements with Resources don't get grouped with those with NotResources."""
 
-    policy1 = policy.InternalStatement(
+    policy1 = policy.Statement(
         {
             "Sid": "El",
             "Effect": "Allow",
@@ -276,7 +268,7 @@ def test_grouped_actions_notresources():
         }
     )
 
-    policy2 = policy.InternalStatement(
+    policy2 = policy.Statement(
         {
             "Sid": "Knee",
             "Effect": "Allow",
@@ -305,7 +297,7 @@ def test_grouped_actions_notresources():
 def test_grouped_resources():
     """Simple statements are grouped as expected."""
 
-    policy1 = policy.InternalStatement(
+    policy1 = policy.Statement(
         {
             "Sid": "El",
             "Effect": "Allow",
@@ -314,7 +306,7 @@ def test_grouped_resources():
         }
     )
 
-    policy2 = policy.InternalStatement(
+    policy2 = policy.Statement(
         {
             "Sid": "Knee",
             "Effect": "Allow",
@@ -336,7 +328,7 @@ def test_grouped_resources():
 def test_grouped_resources_different_actions():
     """Statements with different actions don't get grouped together."""
 
-    policy1 = policy.InternalStatement(
+    policy1 = policy.Statement(
         {
             "Sid": "El",
             "Effect": "Allow",
@@ -345,7 +337,7 @@ def test_grouped_resources_different_actions():
         }
     )
 
-    policy2 = policy.InternalStatement(
+    policy2 = policy.Statement(
         {
             "Sid": "Knee",
             "Effect": "Allow",
@@ -374,7 +366,7 @@ def test_grouped_resources_different_actions():
 def test_grouped_resources_notactions():
     """Statements with Actions don't get grouped with those with NotActions."""
 
-    policy1 = policy.InternalStatement(
+    policy1 = policy.Statement(
         {
             "Sid": "El",
             "Effect": "Allow",
@@ -383,7 +375,7 @@ def test_grouped_resources_notactions():
         }
     )
 
-    policy2 = policy.InternalStatement(
+    policy2 = policy.Statement(
         {
             "Sid": "Knee",
             "Effect": "Allow",

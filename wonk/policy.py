@@ -9,15 +9,15 @@ from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
 from wonk.constants import JSON_ARGS, MAX_MANAGED_POLICY_SIZE
-from wonk.models import InternalStatement, Policy, Statement, canonicalize_resources, to_set
+from wonk.models import Policy, Statement, StatementData, canonicalize_resources, to_set
 
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
 
-def minify(policies: List[Policy]) -> List[InternalStatement]:
+def minify(policies: List[Policy]) -> List[Statement]:
     """Reduce the input policies to the minimal set of functionally identical equivalents."""
 
-    internal_statements: List[InternalStatement] = []
+    internal_statements: List[Statement] = []
     for policy in policies:
         internal_statements.extend(policy.statements)
 
@@ -33,13 +33,13 @@ def minify(policies: List[Policy]) -> List[InternalStatement]:
     return internal_statements
 
 
-def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
+def grouped_actions(statements: List[Statement]) -> Tuple[bool, List[Statement]]:
     """Merge similar policies' actions.
 
     Returns a list of statements whose actions have been combined when possible.
     """
 
-    statement_sets: Dict[str, InternalStatement] = {}
+    statement_sets: Dict[str, Statement] = {}
     changed = False
 
     for statement in statements:
@@ -59,13 +59,13 @@ def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[Int
     return changed, list(statement_sets.values())
 
 
-def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
+def grouped_resources(statements: List[Statement]) -> Tuple[bool, List[Statement]]:
     """Merge similar policies' resources.
 
     Returns a list of statements whose resources have been combined when possible.
     """
 
-    statement_sets: Dict[str, InternalStatement] = {}
+    statement_sets: Dict[str, Statement] = {}
     changed = False
 
     for statement in statements:
@@ -87,7 +87,7 @@ def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[I
     return changed, list(statement_sets.values())
 
 
-def tiniest_json(data: Statement) -> str:
+def tiniest_json(data: StatementData) -> str:
     """Return the smallest representation of the data."""
     return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
 
@@ -138,7 +138,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
         # policy as-is, then group its statements together into *another* new, optimized policy,
         # and emit that one.
         unmerged_policy = Policy(
-            statements=[InternalStatement(json.loads(statement)) for statement in statement_set]
+            statements=[Statement(json.loads(statement)) for statement in statement_set]
         )
         merged_policy = Policy(statements=minify([unmerged_policy]))
         policies.append(merged_policy)

@@ -169,13 +169,13 @@ def test_canonicalize_resources_wildcards():
 def test_grouping_for_actions(statement, expected):
     """Statements can be grouped by their expected key."""
 
-    assert models.InternalStatement(statement).grouping_for_actions() == expected
+    assert models.Statement(statement).grouping_for_actions() == expected
 
 
 def test_sorting_key():
     """Ensure sorting keys have the expected shape and are ordered correctly."""
 
-    statement1 = models.InternalStatement(STATEMENT_WITH_CONDITION)
+    statement1 = models.Statement(STATEMENT_WITH_CONDITION)
 
     sorting_key1 = statement1.sorting_key()
 
@@ -193,7 +193,7 @@ def test_sorting_key():
         ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
     )
 
-    statement2 = models.InternalStatement(STATEMENT_DENY_NOTRESOURCE)
+    statement2 = models.Statement(STATEMENT_DENY_NOTRESOURCE)
 
     sorting_key2 = statement2.sorting_key()
 
@@ -208,7 +208,7 @@ def test_sorting_key():
         ["SVC:BadAction1", "SVC:BadAction4"],
     )
 
-    statement3 = models.InternalStatement(STATEMENT_SIMPLE)
+    statement3 = models.Statement(STATEMENT_SIMPLE)
 
     sorting_key3 = statement3.sorting_key()
 
@@ -228,13 +228,13 @@ def test_sorting_key_sorts_correctly():
     """The output of sorting_key is orderable in the expected way."""
 
     # This will come second because it has an Action, and Effect=Allow, and Resource=*.
-    statement1 = models.InternalStatement(STATEMENT_WITH_CONDITION)
+    statement1 = models.Statement(STATEMENT_WITH_CONDITION)
 
     # This will come third because it has a NotAction, and a specific NotResource.
-    statement2 = models.InternalStatement(STATEMENT_DENY_NOTRESOURCE)
+    statement2 = models.Statement(STATEMENT_DENY_NOTRESOURCE)
 
     # This will come first because it's the simplest statement.
-    statement3 = models.InternalStatement(STATEMENT_SIMPLE)
+    statement3 = models.Statement(STATEMENT_SIMPLE)
 
     assert sorted((statement1, statement2, statement3), key=lambda obj: obj.sorting_key()) == [
         statement3,
@@ -247,7 +247,7 @@ def test_policy_render():
     """A rendered policy looks like we'd expect it to."""
 
     # This should be output last because it's just some random statement.
-    statement_1 = models.InternalStatement(
+    statement_1 = models.Statement(
         {
             "Effect": "Deny",
             "Action": {"SVC:BadAction1", "SVC:BadAction4"},
@@ -256,7 +256,7 @@ def test_policy_render():
     )
 
     # This should be output second because it's the NotAction version of the minimal statement.
-    statement_2 = models.InternalStatement(
+    statement_2 = models.Statement(
         {
             "Effect": "Allow",
             "NotAction": {"SVC:OtherAction1", "SVC:OtherAction5"},
@@ -265,7 +265,7 @@ def test_policy_render():
     )
 
     # This should be output first because it's the minimal statement.
-    statement_3 = models.InternalStatement(
+    statement_3 = models.Statement(
         {
             "Effect": "Allow",
             "Action": {"SVC:Action1", "SVC:Action2", "SVC:Action3"},
@@ -301,9 +301,7 @@ def test_policy_render():
 def test_split_statement():
     """Statements are correctly split into smaller chunks."""
 
-    splitted = models.InternalStatement(
-        {"Action": list(ascii_lowercase), "Resource": "foo"}
-    ).split(100)
+    splitted = models.Statement({"Action": list(ascii_lowercase), "Resource": "foo"}).split(100)
 
     assert next(splitted) == {
         "Action": ["a", "b", "c", "d", "e", "f", "g", "h", "i"],

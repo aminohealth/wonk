@@ -18,14 +18,14 @@ from .constants import (
 )
 from .exceptions import UnshrinkablePolicyError
 
-Statement = Dict[str, Any]
+StatementData = Dict[str, Any]
 
 
 @dataclass(frozen=True)
-class InternalStatement:
+class Statement:
     """An intermediate representation of an AWS policy statement."""
 
-    statement: Statement
+    statement: StatementData
 
     @property
     def action_key(self):
@@ -72,7 +72,7 @@ class InternalStatement:
 
         return self.__class__(statement)
 
-    def as_json(self) -> Statement:
+    def as_json(self) -> StatementData:
         """Convert an internal statement into its AWS-ready representation."""
 
         statement = copy.deepcopy(self.rest)
@@ -172,7 +172,7 @@ class InternalStatement:
             sorted(self.action_value),
         )
 
-    def split(self, max_statement_size: int) -> Generator[Statement, None, None]:
+    def split(self, max_statement_size: int) -> Generator[StatementData, None, None]:
         """Split the original statement into a series of chunks that are below the size limit."""
 
         statement_action = self.action_key
@@ -201,7 +201,7 @@ class Policy:
 
     DEFAULT_ID = "*" * 32
 
-    statements: List[InternalStatement]
+    statements: List[Statement]
     version: str = field(default="2012-10-17")
 
     def __post_init__(self):
@@ -218,7 +218,7 @@ class Policy:
 
         # Sort everything that can be sorted. This ensures that separate runs of the program
         # generate the same outputs, which makes `git diff` happy.
-        self.statements.sort(key=InternalStatement.sorting_key)
+        self.statements.sort(key=Statement.sorting_key)
 
     def __eq__(self, other) -> bool:
         """Return True if this Policy is identical to the other one."""
@@ -271,9 +271,7 @@ class Policy:
 
         return cls(
             version=data.pop(PolicyKey.VERSION, None),
-            statements=[
-                InternalStatement(statement) for statement in data.get(PolicyKey.STATEMENT, [])
-            ],
+            statements=[Statement(statement) for statement in data.get(PolicyKey.STATEMENT, [])],
         )
 
 
@@ -346,7 +344,7 @@ def to_set(value: Union[str, List[str]]) -> Set[str]:
     return set(value)
 
 
-def value_to_set(statement: Statement, key: str) -> Set[str]:
+def value_to_set(statement: StatementData, key: str) -> Set[str]:
     """Return the contents of the statements key as a (possibly empty) set of strings."""
 
     try:
@@ -356,7 +354,7 @@ def value_to_set(statement: Statement, key: str) -> Set[str]:
     return to_set(value)
 
 
-def which_type(statement: Statement, choices: Tuple[StatementKey, StatementKey]) -> str:
+def which_type(statement: StatementData, choices: Tuple[StatementKey, StatementKey]) -> str:
     """Return whichever of the choices of keys is in the statement.
 
     Note: All policy statements must have exactly one of these keys, so this raises an error if
