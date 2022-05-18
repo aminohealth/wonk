@@ -2,35 +2,82 @@
 
 import copy
 import json
+import math
 import re
-from typing import Any, Dict, List, Set, Tuple, Union
+from dataclasses import dataclass, field
+from hashlib import sha256
+from typing import Any, Dict, Generator, List, Set, Tuple, Union
 
-from .constants import ACTION_KEYS, JSON_ARGS, RESOURCE_KEYS, StatementKey
+from .constants import (
+    ACTION_KEYS,
+    JSON_ARGS,
+    MAX_MANAGED_POLICY_SIZE,
+    RESOURCE_KEYS,
+    PolicyKey,
+    StatementKey,
+)
+from .exceptions import UnshrinkablePolicyError
 
-Statement = Dict[str, Any]
-Policy = Dict[str, Any]
+StatementData = Dict[str, Any]
 
 
-class InternalStatement:
+@dataclass(frozen=True)
+class Statement:
     """An intermediate representation of an AWS policy statement."""
 
-    def __init__(self, statement: Statement):
-        """Convert an AWS statement into an internal representation that's easier to process."""
+    statement: StatementData
 
-        statement = copy.deepcopy(statement)
-        statement.pop(StatementKey.SID, None)
+    def __str__(self) -> str:
+        """Return the smallest representation of the Statement."""
 
-        self.action_key = which_type(statement, ACTION_KEYS)
-        self.action_value = value_to_set(statement, self.action_key)
-        statement.pop(self.action_key)
+        return smallest_json(self.as_json())
 
-        self.resource_key = which_type(statement, RESOURCE_KEYS)
-        self.resource_value = canonicalize_resources(value_to_set(statement, self.resource_key))
-        statement.pop(self.resource_key)
+    @property
+    def action_key(self):
+        """Return whichever of the statement's Action or NotAction key is defined."""
 
-        self.rest = statement
+        return which_type(self.statement, ACTION_KEYS)
 
-    def render(self) -> Statement:
+    @property
+    def action_value(self):
+        """Return the value of the statement's Action or NotAction key."""
+
+        return value_to_set(self.statement, self.action_key)
+
+    @property
+    def resource_key(self):
+        """Return whichever of the statement's Resource or NotResource key is defined."""
+
+        return which_type(self.statement, RESOURCE_KEYS)
+
+    @property
+    def resource_value(self):
+        """Return the value of the statement's Resource or NotResource key."""
+
+        return canonicalize_resources(value_to_set(self.statement, self.resource_key))
+
+    @property
+    def rest(self):
+        """Return everything but the statement's {Not,}Action, {Not,}Resource, and Sid keys."""
+
+        rest = copy.deepcopy(self.statement)
+        rest.pop(StatementKey.SID, None)
+        del rest[self.action_key]
+        del rest[self.resource_key]
+        return rest
+
+    def replace(self, *, action_value=None, resource_value=None):
+        """Return a copy of the statement with the given keys replaced."""
+
+        statement = copy.deepcopy(self.statement)
+        if action_value is not None:
+            statement[self.action_key] = action_value
+        if resource_value is not None:
+            statement[self.resource_key] = resource_value
+
+        return self.__class__(statement)
+
+    def as_json(self) -> StatementData:
         """Convert an internal statement into its AWS-ready representation."""
 
         statement = copy.deepcopy(self.rest)
@@ -126,6 +173,114 @@ class InternalStatement:
             sorted(self.action_value),
         )
 
+    def split(self, max_statement_size: int) -> Generator[StatementData, None, None]:
+        """Split the original statement into a series of chunks that are below the size limit."""
+
+        statement_action = self.action_key
+        actions = sorted(self.action_value)
+
+        # Why .45? If we need to break a statement up, we may as well make the resulting parts
+        # small enough that the solver can easily pack them with others. A bad outcome here would
+        # be to end up with 20 statements that were each 60% of the maximum size so that no two
+        # could be packed together. However, there _is_ a little bit of overhead in splitting them
+        # because each statement is wrapped in a dict that may have several keys in it. In the end,
+        # "a little smaller than half the maximum" seemed about right.
+
+        chunks = math.ceil(len(str(self)) / (max_statement_size * 0.45))
+        chunk_size = math.ceil(len(actions) / chunks)
+
+        for base in range(0, len(actions), chunk_size):
+            sub_statement = self.rest
+            sub_statement[self.resource_key] = self.resource_value
+            sub_statement[statement_action] = actions[base : base + chunk_size]  # noqa: E203
+            yield sub_statement
+
+
+@dataclass(frozen=True)
+class Policy:
+    """Represent an AWS policy."""
+
+    DEFAULT_ID = "*" * 32
+
+    statements: List[Statement]
+    version: str = field(default="2012-10-17")
+
+    def __post_init__(self):
+        """Clean up passed-in values."""
+
+        # According to the policy language grammar (see
+        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
+        # Statement key should have a list of statements, and indeed that's almost always the case.
+        # Some of Amazon's own policies (see AWSCertificateManagerReadOnly) have a Statement key
+        # that points to a dict instead of a list of dicts. This ensures that we're always dealing
+        # with a list of statements.
+        if isinstance(self.statements, dict):
+            self.__setattr__("statements", [self.statements])
+
+        # Sort everything that can be sorted. This ensures that separate runs of the program
+        # generate the same outputs, which makes `git diff` happy.
+        self.statements.sort(key=Statement.sorting_key)
+
+    def __str__(self) -> str:
+        """Return the smallest possible JSON representation of the Policy."""
+
+        return smallest_json(
+            {
+                PolicyKey.VERSION: self.version,
+                PolicyKey.ID: self.DEFAULT_ID,  # Don't compute the Policy's ID just for this.
+                PolicyKey.STATEMENT: [statement.as_json() for statement in self.statements],
+            }
+        )
+
+    def __eq__(self, other) -> bool:
+        """Return True if this Policy is identical to the other one."""
+
+        return self.as_json() == other.as_json()
+
+    def as_json(self) -> Dict[str, Any]:
+        """Represent the Policy as a JSON object."""
+
+        return {
+            PolicyKey.VERSION: self.version,
+            PolicyKey.ID: self.id,
+            PolicyKey.STATEMENT: [statement.as_json() for statement in self.statements],
+        }
+
+    def render(self) -> str:
+        """Return the most aesthetic representation of the Policy that fits in the size."""
+
+        data = self.as_json()
+        for args in JSON_ARGS:
+            packed = json.dumps(data, **args)
+            if len(packed) <= MAX_MANAGED_POLICY_SIZE:
+                return packed
+
+        raise UnshrinkablePolicyError(
+            f"Unable to shrink the data into into {MAX_MANAGED_POLICY_SIZE} characters: {data!r}"
+        )
+
+    @property
+    def id(self) -> str:
+        """Return the Policy's ID as a hash of its contents."""
+
+        digest = sha256(str(self).encode()).hexdigest()
+        return digest[: len(self.DEFAULT_ID)]
+
+    @classmethod
+    def from_dict(cls, data):
+        """Create a Policy object from a dictionary."""
+
+        return cls(
+            version=data.pop(PolicyKey.VERSION, None),
+            statements=[Statement(statement) for statement in data.get(PolicyKey.STATEMENT, [])],
+        )
+
+
+def smallest_json(data: dict) -> str:
+    """Return the smallest possible JSON representation of the dict."""
+
+    return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
+
 
 def deduped_items(items: Set[str]) -> List[str]:
     """Return a sorted list of all the unique items in `items`, ignoring case."""
@@ -196,8 +351,8 @@ def to_set(value: Union[str, List[str]]) -> Set[str]:
     return set(value)
 
 
-def value_to_set(statement: Statement, key: str) -> Set[str]:
-    """Return the content's of the statements key as a (possibly empty) set of strings."""
+def value_to_set(statement: StatementData, key: str) -> Set[str]:
+    """Return the contents of the statements key as a (possibly empty) set of strings."""
 
     try:
         value = statement[key]
@@ -206,7 +361,7 @@ def value_to_set(statement: Statement, key: str) -> Set[str]:
     return to_set(value)
 
 
-def which_type(statement: Statement, choices: Tuple[StatementKey, StatementKey]) -> str:
+def which_type(statement: StatementData, choices: Tuple[StatementKey, StatementKey]) -> str:
     """Return whichever of the choices of keys is in the statement.
 
     Note: All policy statements must have exactly one of these keys, so this raises an error if

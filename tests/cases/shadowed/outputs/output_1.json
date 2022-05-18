@@ -1,5 +1,6 @@
 {
-    "Id": "f6954ea1f63c46e212fd53043faf8a64",
+    "Version": "2012-10-17",
+    "Id": "81ae08b722646d014d79f6f931361b98",
     "Statement": [
         {
             "Action": [
@@ -9,6 +10,5 @@
             "Effect": "Allow",
             "Resource": "*"
         }
-    ],
-    "Version": "2012-10-17"
+    ]
 }

@@ -1,5 +1,6 @@
 {
-    "Id": "aa19d49457324b0a5a7eb9ebec5a638f",
+    "Version": "2012-10-17",
+    "Id": "17364a895fb4c0b5d5efa4a0786024fd",
     "Statement": [
         {
             "Action": [
@@ -29,6 +30,5 @@
             "Principal": "arn:some_resource2",
             "Resource": "*"
         }
-    ],
-    "Version": "2012-10-17"
+    ]
 }

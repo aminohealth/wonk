@@ -1,5 +1,8 @@
 """Test the wonk.models module."""
 
+import json
+from string import ascii_lowercase
+
 import pytest
 
 from wonk import models
@@ -166,13 +169,13 @@ def test_canonicalize_resources_wildcards():
 def test_grouping_for_actions(statement, expected):
     """Statements can be grouped by their expected key."""
 
-    assert models.InternalStatement(statement).grouping_for_actions() == expected
+    assert models.Statement(statement).grouping_for_actions() == expected
 
 
 def test_sorting_key():
     """Ensure sorting keys have the expected shape and are ordered correctly."""
 
-    statement1 = models.InternalStatement(STATEMENT_WITH_CONDITION)
+    statement1 = models.Statement(STATEMENT_WITH_CONDITION)
 
     sorting_key1 = statement1.sorting_key()
 
@@ -190,7 +193,7 @@ def test_sorting_key():
         ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
     )
 
-    statement2 = models.InternalStatement(STATEMENT_DENY_NOTRESOURCE)
+    statement2 = models.Statement(STATEMENT_DENY_NOTRESOURCE)
 
     sorting_key2 = statement2.sorting_key()
 
@@ -205,7 +208,7 @@ def test_sorting_key():
         ["SVC:BadAction1", "SVC:BadAction4"],
     )
 
-    statement3 = models.InternalStatement(STATEMENT_SIMPLE)
+    statement3 = models.Statement(STATEMENT_SIMPLE)
 
     sorting_key3 = statement3.sorting_key()
 
@@ -225,16 +228,90 @@ def test_sorting_key_sorts_correctly():
     """The output of sorting_key is orderable in the expected way."""
 
     # This will come second because it has an Action, and Effect=Allow, and Resource=*.
-    statement1 = models.InternalStatement(STATEMENT_WITH_CONDITION)
+    statement1 = models.Statement(STATEMENT_WITH_CONDITION)
 
     # This will come third because it has a NotAction, and a specific NotResource.
-    statement2 = models.InternalStatement(STATEMENT_DENY_NOTRESOURCE)
+    statement2 = models.Statement(STATEMENT_DENY_NOTRESOURCE)
 
     # This will come first because it's the simplest statement.
-    statement3 = models.InternalStatement(STATEMENT_SIMPLE)
+    statement3 = models.Statement(STATEMENT_SIMPLE)
 
     assert sorted((statement1, statement2, statement3), key=lambda obj: obj.sorting_key()) == [
         statement3,
         statement1,
         statement2,
     ]
+
+
+def test_policy_render():
+    """A rendered policy looks like we'd expect it to."""
+
+    # This should be output last because it's just some random statement.
+    statement_1 = models.Statement(
+        {
+            "Effect": "Deny",
+            "Action": {"SVC:BadAction1", "SVC:BadAction4"},
+            "Resource": "*",
+        }
+    )
+
+    # This should be output second because it's the NotAction version of the minimal statement.
+    statement_2 = models.Statement(
+        {
+            "Effect": "Allow",
+            "NotAction": {"SVC:OtherAction1", "SVC:OtherAction5"},
+            "Resource": "*",
+        }
+    )
+
+    # This should be output first because it's the minimal statement.
+    statement_3 = models.Statement(
+        {
+            "Effect": "Allow",
+            "Action": {"SVC:Action1", "SVC:Action2", "SVC:Action3"},
+            "Resource": "*",
+        }
+    )
+
+    rendered = models.Policy(statements=[statement_1, statement_2, statement_3]).render()
+
+    assert json.loads(rendered) == {
+        "Version": "2012-10-17",
+        "Id": "2f2e3ef90177f911cf7382d4719a78b7",
+        "Statement": [
+            {
+                "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
+                "Effect": "Allow",
+                "Resource": "*",
+            },
+            {
+                "Action": ["SVC:BadAction1", "SVC:BadAction4"],
+                "Effect": "Deny",
+                "Resource": "*",
+            },
+            {
+                "Effect": "Allow",
+                "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
+                "Resource": "*",
+            },
+        ],
+    }
+
+
+def test_split_statement():
+    """Statements are correctly split into smaller chunks."""
+
+    splitted = models.Statement({"Action": list(ascii_lowercase), "Resource": "foo"}).split(100)
+
+    assert next(splitted) == {
+        "Action": ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+        "Resource": "foo",
+    }
+    assert next(splitted) == {
+        "Action": ["j", "k", "l", "m", "n", "o", "p", "q", "r"],
+        "Resource": "foo",
+    }
+    assert next(splitted) == {
+        "Action": ["s", "t", "u", "v", "w", "x", "y", "z"],
+        "Resource": "foo",
+    }

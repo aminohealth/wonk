@@ -1,46 +1,25 @@
 """Manage AWS policies."""
 
-import copy
 import json
-import math
 import pathlib
 import re
-from hashlib import sha256
-from typing import Dict, Generator, List, Tuple, Union
+from typing import Dict, List, Tuple
 
 from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
-from wonk.constants import ACTION_KEYS, JSON_ARGS, MAX_MANAGED_POLICY_SIZE, PolicyKey
-from wonk.models import (
-    InternalStatement,
-    Policy,
-    Statement,
-    canonicalize_resources,
-    to_set,
-    which_type,
-)
+from wonk.constants import MAX_MANAGED_POLICY_SIZE
+from wonk.models import Policy, Statement, canonicalize_resources, smallest_json, to_set
 
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
 
 
-def minify(policies: List[Policy]) -> List[InternalStatement]:
+def minify(policies: List[Policy]) -> List[Statement]:
     """Reduce the input policies to the minimal set of functionally identical equivalents."""
 
-    internal_statements: List[InternalStatement] = []
+    internal_statements: List[Statement] = []
     for policy in policies:
-        # According to the policy language grammar (see
-        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
-        # Statement key should have a list of statements, and indeed that's almost always the case.
-        # Some of Amazon's own policies (see AWSCertificateManagerReadOnly) have a Statement key
-        # that points to a dict instead of a list of dicts. This ensures that we're always dealing
-        # with a list of statements.
-        statements = policy[PolicyKey.STATEMENT]
-        if isinstance(statements, dict):
-            statements = [statements]
-
-        for statement in statements:
-            internal_statements.append(InternalStatement(statement))
+        internal_statements.extend(policy.statements)
 
     this_changed = True
     while this_changed:
@@ -54,13 +33,13 @@ def minify(policies: List[Policy]) -> List[InternalStatement]:
     return internal_statements
 
 
-def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
+def grouped_actions(statements: List[Statement]) -> Tuple[bool, List[Statement]]:
     """Merge similar policies' actions.
 
     Returns a list of statements whose actions have been combined when possible.
     """
 
-    statement_sets: Dict[str, InternalStatement] = {}
+    statement_sets: Dict[str, Statement] = {}
     changed = False
 
     for statement in statements:
@@ -70,22 +49,23 @@ def grouped_actions(statements: List[InternalStatement]) -> Tuple[bool, List[Int
             existing_item = statement_sets[group]
         except KeyError:
             statement_sets[group] = statement
-        else:
-            new_action_value = existing_item.action_value | statement.action_value
-            if existing_item.action_value != new_action_value:
-                changed = True
-                existing_item.action_value = new_action_value
+            continue
+
+        new_action_value = existing_item.action_value | statement.action_value
+        if existing_item.action_value != new_action_value:
+            changed = True
+            statement_sets[group] = existing_item.replace(action_value=new_action_value)
 
     return changed, list(statement_sets.values())
 
 
-def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[InternalStatement]]:
+def grouped_resources(statements: List[Statement]) -> Tuple[bool, List[Statement]]:
     """Merge similar policies' resources.
 
     Returns a list of statements whose resources have been combined when possible.
     """
 
-    statement_sets: Dict[str, InternalStatement] = {}
+    statement_sets: Dict[str, Statement] = {}
     changed = False
 
     for statement in statements:
@@ -95,90 +75,26 @@ def grouped_resources(statements: List[InternalStatement]) -> Tuple[bool, List[I
             existing_item = statement_sets[group]
         except KeyError:
             statement_sets[group] = statement
-        else:
-            new_resource_value = canonicalize_resources(
-                to_set(existing_item.resource_value) | to_set(statement.resource_value)
-            )
-            if existing_item.resource_value != new_resource_value:
-                changed = True
-                existing_item.resource_value = new_resource_value
+            continue
+
+        new_resource_value = canonicalize_resources(
+            to_set(existing_item.resource_value) | to_set(statement.resource_value)
+        )
+        if existing_item.resource_value != new_resource_value:
+            changed = True
+            statement_sets[group] = existing_item.replace(resource_value=new_resource_value)
 
     return changed, list(statement_sets.values())
-
-
-def blank_policy() -> Policy:
-    """Return the skeleton of a policy with no statments."""
-
-    return {
-        PolicyKey.VERSION: "2012-10-17",
-        PolicyKey.STATEMENT: [],
-    }
-
-
-def render(statements: List[InternalStatement]) -> Policy:
-    """Turn the contents of the statement sets into a valid AWS policy."""
-
-    policy = blank_policy()
-
-    # Sort everything that can be sorted. This ensures that separate runs of the program generate
-    # the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to see if we're
-    # actually updating a policy that we've written out, and if so, skip writing it again (with a
-    # new `Id` key).
-    for internal_statement in sorted(statements, key=lambda obj: obj.sorting_key()):
-        policy[PolicyKey.STATEMENT].append(internal_statement.render())
-
-    return policy
-
-
-def packed_json(data: Policy, max_size: int) -> str:
-    """Return the most aesthetic representation of the data that fits in the size."""
-    for args in JSON_ARGS:
-        packed = json.dumps(data, sort_keys=True, **args)
-        if len(packed) <= max_size:
-            return packed
-
-    raise exceptions.UnshrinkablePolicyError(
-        f"Unable to shrink the data into into {max_size} characters: {data!r}"
-    )
-
-
-def tiniest_json(data: Union[Policy, Statement]) -> str:
-    """Return the smallest representation of the data."""
-    return json.dumps(data, sort_keys=True, **JSON_ARGS[-1])
-
-
-def split_statement(
-    statement: Statement, max_statement_size: int
-) -> Generator[Statement, None, None]:
-    """Split the original statement into a series of chunks that are below the size limit."""
-
-    statement_action = which_type(statement, ACTION_KEYS)
-    actions = statement[statement_action]
-
-    # Why .45? If we need to break a statement up, we may as well make the resulting parts small
-    # enough that the solver can easily pack them with others. A bad outcome here would be to end
-    # up with 20 statements that were each 60% of the maximum size so that no two could be packed
-    # together. However, there _is_ a little bit of overhead in splitting them because each
-    # statement is wrapped in a dict that may have several keys in it. In the end, "a little
-    # smaller than half the maximum" seemed about right.
-
-    chunks = math.ceil(len(tiniest_json(statement)) / (max_statement_size * 0.45))
-    chunk_size = math.ceil(len(actions) / chunks)
-
-    for base in range(0, len(actions), chunk_size):
-        sub_statement = {key: value for key, value in statement.items() if key != statement_action}
-        sub_statement[statement_action] = actions[base : base + chunk_size]  # noqa: E203
-        yield sub_statement
 
 
 def combine(policies: List[Policy]) -> List[Policy]:
     """Combine policy files into the smallest possible set of outputs."""
 
-    new_policy = render(minify(policies))
+    new_policy = Policy(statements=minify(policies))
 
     # Simplest case: we're able to squeeze everything into a single file. This is the ideal.
     try:
-        packed_json(new_policy, MAX_MANAGED_POLICY_SIZE)
+        new_policy.render()
     except exceptions.UnshrinkablePolicyError:
         pass
     else:
@@ -193,21 +109,21 @@ def combine(policies: List[Policy]) -> List[Policy]:
     # and it's guaranteed that we can fit at most n-1 statements into a single document because if
     # we could fit all n then we wouldn't have made it to this point in the program. And yes, this
     # is exactly the part of the program where we start caring about every byte.
-    statements = new_policy[PolicyKey.STATEMENT]
-    minimum_possible_policy_size = len(tiniest_json(blank_policy()))
-    max_number_of_commas = len(statements) - 2
+    minimum_possible_policy_size = len(str(Policy(statements=[])))
+    max_number_of_commas = len(new_policy.statements) - 2
     max_statement_size = (
         MAX_MANAGED_POLICY_SIZE - minimum_possible_policy_size - max_number_of_commas
     )
 
     packed_list = []
-    for statement in statements:
-        packed = tiniest_json(statement)
-        if len(packed) > max_statement_size:
-            for splitted in split_statement(statement, max_statement_size):
-                packed_list.append(tiniest_json(splitted))
-        else:
+    for statement in new_policy.statements:
+        packed = str(statement)
+        if len(packed) <= max_statement_size:
             packed_list.append(packed)
+            continue
+
+        for statement_dict in statement.split(max_statement_size):
+            packed_list.append(smallest_json(statement_dict))
 
     statement_sets = optimizer.pack_statements(packed_list, max_statement_size, 10)
 
@@ -217,11 +133,10 @@ def combine(policies: List[Policy]) -> List[Policy]:
         # that could be merged back together. The easiest way to handle this is to create a new
         # policy as-is, then group its statements together into *another* new, optimized policy,
         # and emit that one.
-        unmerged_policy = blank_policy()
-        unmerged_policy[PolicyKey.STATEMENT] = [
-            json.loads(statement) for statement in statement_set
-        ]
-        merged_policy = render(minify([unmerged_policy]))
+        unmerged_policy = Policy(
+            statements=[Statement(json.loads(statement)) for statement in statement_set]
+        )
+        merged_policy = Policy(statements=minify([unmerged_policy]))
         policies.append(merged_policy)
 
     return policies
@@ -255,6 +170,11 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
         # the plug and refuse to delete them.
         raise exceptions.TooManyPoliciesError(base_name, len(cleanup))
 
+    # For consistency, delete all of the pre-existing files before we start so we can't be left
+    # with a mix of old and new files.
+    for old in cleanup:
+        old.unlink()
+
     # Write each of the files that file go into this policy set, and create a list of the filenames
     # we've written.
     output_filenames = []
@@ -262,64 +182,9 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
         output_path = output_dir / f"{base_name}_{i}.json"
         output_filenames.append(str(output_path))
 
-        # Don't delete a file right after we create it.
-        cleanup.discard(output_path)
-
-        # Check if the on-disk file is identical to this one. If so, leave it alone so that we
-        # don't have unnecessary churn in Git, Terraform, etc.
-        #
-        # We minimize churn by sorting collections whenever possible so that they're always output
-        # in the same order if the original filenames change.
-        try:
-            on_disk_policy = json.loads(output_path.read_text())
-        except FileNotFoundError:
-            pass
-        else:
-            if policies_are_identical(on_disk_policy, policy):
-                continue
-
-        output_path.write_text(packed_json(policy_with_id(policy), MAX_MANAGED_POLICY_SIZE))
-
-    # Delete all of the pre-existing files, minus the ones we visited above.
-    for old in cleanup:
-        old.unlink()
+        output_path.write_text(policy.render())
 
     return output_filenames
-
-
-def policy_with_id(policy: Policy) -> Policy:
-    """Return a copy of the Policy with the Id computed from the Policy's contents."""
-
-    policy = copy.deepcopy(policy)
-
-    statements = tiniest_json(policy[PolicyKey.STATEMENT])
-
-    digest = sha256(statements.encode()).hexdigest()[:32]
-    policy[PolicyKey.ID] = digest
-
-    return policy
-
-
-def policies_are_identical(old_policy: Policy, new_policy: Policy) -> bool:
-    """Return True if the old and new policies are identical other than their IDs."""
-
-    old_policy, new_policy = copy.deepcopy(old_policy), copy.deepcopy(new_policy)
-
-    try:
-        # If the on-disk policy is missing the `Id` key, then the policy's been altered and we know
-        # it's no longer identical to the new one.
-        del old_policy[PolicyKey.ID]
-    except KeyError:
-        return False
-
-    new_policy.pop(PolicyKey.ID, None)
-
-    # We minimize churn by sorting collections whenever possible so that they're always output in
-    # the same order if the input policies haven't changed. That's better (and in the long run,
-    # easier) than implementing an order-insensitive comparison here because it also keeps the
-    # on-disk policy stable between runs. This makes git happy.
-
-    return old_policy == new_policy
 
 
 def make_cache_file(name: str, version: str) -> pathlib.Path:
