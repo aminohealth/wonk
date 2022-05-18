@@ -172,7 +172,7 @@ class InternalStatement:
             sorted(self.action_value),
         )
 
-    def split_statement(self, max_statement_size: int) -> Generator[Statement, None, None]:
+    def split(self, max_statement_size: int) -> Generator[Statement, None, None]:
         """Split the original statement into a series of chunks that are below the size limit."""
 
         statement_action = self.action_key
@@ -217,9 +217,7 @@ class Policy:
             self.__setattr__("statements", [self.statements])
 
         # Sort everything that can be sorted. This ensures that separate runs of the program
-        # generate the same outputs, which 1) makes `git diff` happy, and 2) lets us later check to
-        # see if we're actually updating a policy that we've written out, and if so, skip writing
-        # it again (with a new `Id` key).
+        # generate the same outputs, which makes `git diff` happy.
         self.statements.sort(key=InternalStatement.sorting_key)
 
     def __eq__(self, other) -> bool:

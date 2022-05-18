@@ -124,7 +124,7 @@ def combine(policies: List[Policy]) -> List[Policy]:
     for statement in new_policy.statements:
         packed = statement.tiniest_json()
         if len(packed) > max_statement_size:
-            for splitted in statement.split_statement(max_statement_size):
+            for splitted in statement.split(max_statement_size):
                 packed_list.append(tiniest_json(splitted))
         else:
             packed_list.append(packed)
