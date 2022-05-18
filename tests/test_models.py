@@ -1,5 +1,6 @@
 """Test the wonk.models module."""
 
+import json
 from string import ascii_lowercase
 
 import pytest
@@ -272,33 +273,29 @@ def test_policy_render():
         }
     )
 
-    rendered = models.Policy(statements=[statement_1, statement_2, statement_3])
+    rendered = models.Policy(statements=[statement_1, statement_2, statement_3]).render()
 
-    assert rendered == models.Policy(
-        statements=[
-            models.InternalStatement(
-                {
-                    "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
-                    "Effect": "Allow",
-                    "Resource": "*",
-                }
-            ),
-            models.InternalStatement(
-                {
-                    "Action": ["SVC:BadAction1", "SVC:BadAction4"],
-                    "Effect": "Deny",
-                    "Resource": "*",
-                }
-            ),
-            models.InternalStatement(
-                {
-                    "Effect": "Allow",
-                    "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
-                    "Resource": "*",
-                }
-            ),
-        ]
-    )
+    assert json.loads(rendered) == {
+        "Version": "2012-10-17",
+        "Id": "2f2e3ef90177f911cf7382d4719a78b7",
+        "Statement": [
+            {
+                "Action": ["SVC:Action1", "SVC:Action2", "SVC:Action3"],
+                "Effect": "Allow",
+                "Resource": "*",
+            },
+            {
+                "Action": ["SVC:BadAction1", "SVC:BadAction4"],
+                "Effect": "Deny",
+                "Resource": "*",
+            },
+            {
+                "Effect": "Allow",
+                "NotAction": ["SVC:OtherAction1", "SVC:OtherAction5"],
+                "Resource": "*",
+            },
+        ],
+    }
 
 
 def test_split_statement():
@@ -306,7 +303,7 @@ def test_split_statement():
 
     splitted = models.InternalStatement(
         {"Action": list(ascii_lowercase), "Resource": "foo"}
-    ).split_statement(100)
+    ).split(100)
 
     assert next(splitted) == {
         "Action": ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
