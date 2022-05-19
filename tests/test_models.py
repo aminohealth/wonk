@@ -315,3 +315,17 @@ def test_split_statement():
         "Action": ["s", "t", "u", "v", "w", "x", "y", "z"],
         "Resource": "foo",
     }
+
+
+def test_policy_from_dict_malformed_ok():
+    """Malformed policies with dicts as their Statement are parsed correctly."""
+
+    rendered = models.Policy.from_dict(
+        {"Statement": {"Effect": "Deny", "Action": "twirl", "Resource": "widget"}}
+    ).render()
+
+    assert json.loads(rendered) == {
+        "Version": "2012-10-17",
+        "Id": "2d8f6cb90c80585ade0580022df5c75a",
+        "Statement": [{"Effect": "Deny", "Action": "twirl", "Resource": "widget"}],
+    }
