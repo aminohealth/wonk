@@ -208,15 +208,6 @@ class Policy:
     def __post_init__(self):
         """Clean up passed-in values."""
 
-        # According to the policy language grammar (see
-        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
-        # Statement key should have a list of statements, and indeed that's almost always the case.
-        # Some of Amazon's own policies (see AWSCertificateManagerReadOnly) have a Statement key
-        # that points to a dict instead of a list of dicts. This ensures that we're always dealing
-        # with a list of statements.
-        if isinstance(self.statements, dict):
-            self.__setattr__("statements", [self.statements])
-
         # Sort everything that can be sorted. This ensures that separate runs of the program
         # generate the same outputs, which makes `git diff` happy.
         self.statements.sort(key=Statement.sorting_key)
@@ -270,10 +261,28 @@ class Policy:
     def from_dict(cls, data):
         """Create a Policy object from a dictionary."""
 
-        return cls(
-            version=data.pop(PolicyKey.VERSION, None),
-            statements=[Statement(statement) for statement in data.get(PolicyKey.STATEMENT, [])],
-        )
+        statements = data.get(PolicyKey.STATEMENT, [])
+
+        # According to the policy language grammar (see
+        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_grammar.html) the
+        # Statement key should have a list of statements, and indeed that's almost always the case.
+        # Some of Amazon's own policies (see AWSCertificateManagerReadOnly) have a Statement key
+        # that points to a dict instead of a list of dicts.
+        #
+        # This ensures that we're always dealing with a list of statements.
+        if isinstance(statements, dict):
+            statements = [statements]
+
+        kwargs = {"statements": [Statement(statement) for statement in statements]}
+
+        try:
+            version = data[PolicyKey.VERSION]
+        except KeyError:
+            pass
+        else:
+            kwargs["version"] = version
+
+        return cls(**kwargs)  # type: ignore
 
 
 def smallest_json(data: dict) -> str:
