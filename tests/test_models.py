@@ -43,70 +43,63 @@ STATEMENT_DENY_NOTRESOURCE = {
 }
 
 
-def test_canonicalize_actions_removes_dupes():
+def test_collect_wildcard_matches_removes_dupes():
     """Duplicate actions are removed."""
 
     # This is vacuously true as sets are deduplicated by their nature.
-    assert models.canonicalize_actions({"foo", "bar", "foo"}) == ["bar", "foo"]
+    assert models.collect_wildcard_matches({"foo", "bar", "foo"}) == ["bar", "foo"]
 
 
-def test_canonicalize_actions_removes_servicewide_shadows():
+def test_collect_wildcard_matches_removes_servicewide_shadows():
     """Shadowed actions at the service level are removed."""
 
-    assert models.canonicalize_actions({"svc:spam", "svc:*", "svc:eggs"}) == ["svc:*"]
+    assert models.collect_wildcard_matches({"svc:spam", "svc:*", "svc:eggs"}) == ["svc:*"]
 
 
-def test_canonicalize_actions_removes_prefixed_shadows():
+def test_collect_wildcard_matches_removes_prefixed_shadows():
     """Shadowed actions whose names match wildcards with prefixes are removed."""
 
-    assert models.canonicalize_actions({"svc:GetSomething", "svc:PutSomething", "svc:Get*"}) == [
+    assert models.collect_wildcard_matches(
+        {"svc:GetSomething", "svc:PutSomething", "svc:Get*"}
+    ) == [
         "svc:Get*",
         "svc:PutSomething",
     ]
 
 
-def test_canonicalize_actions_removes_prefixed_shadows_multiple_wildcards():
+def test_collect_wildcard_matches_removes_prefixed_shadows_multiple_wildcards():
     """Shadowed actions in sets with with multiple wildcards are pruned correctly."""
 
-    assert (
-        models.canonicalize_actions(
-            {
-                "s3:Get*",
-                "s3:*",
-                "s3:List*",
-                "s3:Head*",
-            }
-        )
-        == ["s3:*"]
-    )
+    assert models.collect_wildcard_matches(
+        {
+            "s3:Get*",
+            "s3:*",
+            "s3:List*",
+            "s3:Head*",
+        }
+    ) == ["s3:*"]
 
 
-def test_canonicalize_actions_removes_prefixed_shadows_inconvenient_order():
+def test_collect_wildcard_matches_removes_prefixed_shadows_inconvenient_order():
     """The order of actions doesn't matter when pruning shadowed actions."""
 
-    assert (
-        models.canonicalize_actions(
-            {
-                "s3:GetFoo",
-                "s3:GetFoo*",
-            }
-        )
-        == ["s3:GetFoo*"]
-    )
+    assert models.collect_wildcard_matches(
+        {
+            "s3:GetFoo",
+            "s3:GetFoo*",
+        }
+    ) == ["s3:GetFoo*"]
 
 
-def test_canonicalize_actions_removes_prefixed_shadows_ignore_case():
+def test_collect_wildcard_matches_removes_prefixed_shadows_ignore_case():
     """Wildcard actions which differ only in case are treated as the same action."""
 
-    assert (
-        models.canonicalize_actions(
-            {
-                "s3:getfoo*",
-                "s3:GetFoo*",
-            }
-        )
-        == ["s3:GetFoo*"]
-    )
+    assert models.collect_wildcard_matches(
+        {
+            "s3:getfoo*",
+            "s3:GetFoo*",
+        }
+    ) == ["s3:GetFoo*"]
 
 
 def test_canonicalize_resources_all():
@@ -130,23 +123,20 @@ def test_canonicalize_resources_just_strings():
 def test_canonicalize_resources_wildcards():
     """If any of the resources are strings with wildcards, remove the shadowed resources."""
 
-    assert (
-        models.canonicalize_resources(
-            {
-                "arn:something42",
-                "arn:something23",
-                "arn:something*",
-                "arn:a*",
-                "arn:aa",
-                "arn:aaa",
-                "arn:ba*",
-                "arn:bad",
-                "arn:bb",
-                "arn:bc",
-            }
-        )
-        == ["arn:a*", "arn:ba*", "arn:bb", "arn:bc", "arn:something*"]
-    )
+    assert models.canonicalize_resources(
+        {
+            "arn:something42",
+            "arn:something23",
+            "arn:something*",
+            "arn:a*",
+            "arn:aa",
+            "arn:aaa",
+            "arn:ba*",
+            "arn:bad",
+            "arn:bb",
+            "arn:bc",
+        }
+    ) == ["arn:a*", "arn:ba*", "arn:bb", "arn:bc", "arn:something*"]
 
 
 @pytest.mark.parametrize(
