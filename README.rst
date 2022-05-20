@@ -246,6 +246,9 @@ The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the ter
 
 History
 =======
+**0.6.1**
+  2022-05-20: Important bugfix! Policies large enough to require splitting weren't being processed correctly, causing an exception. This would not have caused data corruption, just a runtime failure.
+
 **0.6.0**
   2022-05-18: Make multiple compression passes over statements, if needed, to provide better results. Deterministically compute policy IDs from a hash of their contents, rather than using a random ID. Internal refactoring makes data flows easier to understand and reason about.
 

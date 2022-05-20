@@ -82,7 +82,7 @@ class Statement:
 
         statement = copy.deepcopy(self.rest)
 
-        statement[self.action_key] = canonicalize_actions(self.action_value)
+        statement[self.action_key] = collect_wildcard_matches(self.action_value)
         statement[self.resource_key] = self.resource_value
 
         return statement
@@ -177,7 +177,7 @@ class Statement:
         """Split the original statement into a series of chunks that are below the size limit."""
 
         statement_action = self.action_key
-        actions = sorted(self.action_value)
+        actions = collect_wildcard_matches(self.action_value)
 
         # Why .45? If we need to break a statement up, we may as well make the resulting parts
         # small enough that the solver can easily pack them with others. A bad outcome here would
@@ -190,7 +190,7 @@ class Statement:
         chunk_size = math.ceil(len(actions) / chunks)
 
         for base in range(0, len(actions), chunk_size):
-            sub_statement = self.rest
+            sub_statement = copy.deepcopy(self.rest)
             sub_statement[self.resource_key] = self.resource_value
             sub_statement[statement_action] = actions[base : base + chunk_size]  # noqa: E203
             yield sub_statement
@@ -322,7 +322,7 @@ def collect_wildcard_matches(items: Set[str]) -> Union[str, List[str]]:
             continue
 
         pattern_string = item.replace("*", ".*")
-        patterns[item.casefold()] = re.compile(fr"^{pattern_string}$", re.IGNORECASE)
+        patterns[item.casefold()] = re.compile(rf"^{pattern_string}$", re.IGNORECASE)
 
     new_items = []
     for item in deduped_items(items):
@@ -335,12 +335,6 @@ def collect_wildcard_matches(items: Set[str]) -> Union[str, List[str]]:
             new_items.append(item)
 
     return new_items
-
-
-def canonicalize_actions(actions: Set[str]) -> Union[str, List[str]]:
-    """Return the set of actions as a sorted list of strings."""
-
-    return collect_wildcard_matches(actions)
 
 
 def canonicalize_resources(resources: Set[str]) -> Union[str, List[str]]:
