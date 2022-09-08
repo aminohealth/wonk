@@ -120,6 +120,18 @@ def test_canonicalize_resources_just_strings():
     assert models.canonicalize_resources({"foo", "bar", "baz"}) == ["bar", "baz", "foo"]
 
 
+def test_canonicalize_resources_multiple_wildcards():
+    """If there are resources with multiple "*" that are equivalent, at least one should be kept"""
+    # Chose # to make sure ordering is not affecting this test, as # < * in ascii
+    assert models.canonicalize_resources({"foo#", "f*#", "f**#"}) == ["f*#"]
+
+
+def test_canonicalize_resources_wildcard_preferred_over_questionmark():
+    """If there are resources with multiple "*" that are equivalent, at least one should be kept"""
+
+    assert models.canonicalize_resources({"f*", "f?"}) == ["f*"]
+
+
 def test_canonicalize_resources_wildcards():
     """If any of the resources are strings with wildcards, remove the shadowed resources."""
 
@@ -137,6 +149,37 @@ def test_canonicalize_resources_wildcards():
             "arn:bc",
         }
     ) == ["arn:a*", "arn:ba*", "arn:bb", "arn:bc", "arn:something*"]
+
+
+def test_canonicalize_resources_questionmark():
+    """If any of the resources are strings with questionmarks, remove the shadowed resources."""
+
+    assert models.canonicalize_resources(
+        {
+            "arn:something42",
+            "arn:something4?",
+            "arn:something?2",
+            "arn:a?",
+            "arn:aa",
+            "arn:aaa",
+        }
+    ) == ["arn:a?", "arn:aa", "arn:aaa", "arn:something42", "arn:something4?", "arn:something?2"]
+
+
+def test_canonicalize_resources_mixed():
+    """If any of the resources are strings with wildcards and questionmarks, remove the shadowed resources."""
+
+    assert models.canonicalize_resources(
+        {
+            "arn:something42",
+            "arn:something4?",
+            "arn:something4*",
+            "arn:a??b*",
+            "arn:aaabccc",
+            "arn:aaaabccc",
+            "arn:aab",
+        }
+    ) == ["arn:a??b*", "arn:aaaabccc", "arn:aaabccc", "arn:aab", "arn:something4*"]
 
 
 @pytest.mark.parametrize(
