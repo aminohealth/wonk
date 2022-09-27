@@ -307,6 +307,23 @@ def test_split_statement():
     }
 
 
+def test_split_resource_statement():
+    splitted = models.Statement({"Action": "foo", "Resource": list(ascii_lowercase)}).split_resource(100)
+
+    assert next(splitted) == {
+        "Action": ["foo"],
+        "Resource": ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+    }
+    assert next(splitted) == {
+        "Action": ["foo"],
+        "Resource": ["j", "k", "l", "m", "n", "o", "p", "q", "r"],
+    }
+    assert next(splitted) == {
+        "Action": ["foo"],
+        "Resource": ["s", "t", "u", "v", "w", "x", "y", "z"],
+    }
+
+
 def test_policy_from_dict_malformed_ok():
     """Malformed policies with dicts as their Statement are parsed correctly."""
 
