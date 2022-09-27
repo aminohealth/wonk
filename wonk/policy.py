@@ -9,6 +9,7 @@ from xdg import xdg_cache_home
 
 from wonk import aws, exceptions, optimizer
 from wonk.constants import MAX_MANAGED_POLICY_SIZE
+from wonk.exceptions import UnpackableStatementsError
 from wonk.models import Policy, Statement, canonicalize_resources, smallest_json, to_set
 
 POLICY_CACHE_DIR = xdg_cache_home() / "com.amino.wonk" / "policies"
@@ -125,7 +126,23 @@ def combine(policies: List[Policy]) -> List[Policy]:
         for statement_dict in statement.split(max_statement_size):
             packed_list.append(smallest_json(statement_dict))
 
-    statement_sets = optimizer.pack_statements(packed_list, max_statement_size, 10)
+    try:
+        statement_sets = optimizer.pack_statements(packed_list, max_statement_size, 10)
+
+    except UnpackableStatementsError:
+        # We may hit in exception if a single statement's list of resources is too long,
+        # try splitting statement by resource rather than action
+        packed_list = []
+        for statement in new_policy.statements:
+            packed = str(statement)
+            if len(packed) <= max_statement_size:
+                packed_list.append(packed)
+                continue
+
+            for statement_dict in statement.split_resource(max_statement_size):
+                packed_list.append(smallest_json(statement_dict))
+
+        statement_sets = optimizer.pack_statements(packed_list, max_statement_size, 10)
 
     policies = []
     for statement_set in statement_sets:

@@ -174,7 +174,7 @@ class Statement:
         )
 
     def split(self, max_statement_size: int) -> Generator[StatementData, None, None]:
-        """Split the original statement into a series of chunks that are below the size limit."""
+        """Split the original statement by action into a series of chunks that are below the size limit."""
 
         statement_action = self.action_key
         actions = collect_wildcard_matches(self.action_value)
@@ -193,6 +193,27 @@ class Statement:
             sub_statement = copy.deepcopy(self.rest)
             sub_statement[self.resource_key] = self.resource_value
             sub_statement[statement_action] = actions[base : base + chunk_size]  # noqa: E203
+            yield sub_statement
+
+    def split_resource(self, max_statement_size: int) -> Generator[StatementData, None, None]:
+        """Split the original statement by resource into a series of chunks that are below the size limit."""
+
+        # Why .45? If we need to break a statement up, we may as well make the resulting parts
+        # small enough that the solver can easily pack them with others. A bad outcome here would
+        # be to end up with 20 statements that were each 60% of the maximum size so that no two
+        # could be packed together. However, there _is_ a little bit of overhead in splitting them
+        # because each statement is wrapped in a dict that may have several keys in it. In the end,
+        # "a little smaller than half the maximum" seemed about right.
+
+        chunks = math.ceil(len(str(self)) / (max_statement_size * 0.45))
+        # Using entire resource value and not collecting wildcards as wildcards in arns can match to
+        # a number of different areas of the arn and don't follow regex standards
+        chunk_size = math.ceil(len(self.resource_value) / chunks)
+
+        for base in range(0, len(self.resource_value), chunk_size):
+            sub_statement = copy.deepcopy(self.rest)
+            sub_statement[self.action_key] = list(self.action_value)
+            sub_statement[self.resource_key] = self.resource_value[base : base + chunk_size]  # noqa: E203
             yield sub_statement
 
 

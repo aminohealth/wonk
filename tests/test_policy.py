@@ -156,6 +156,31 @@ def test_policy_combine_big():
     )
 
 
+def test_policy_combine_big_resource():
+    a_len = int(policy.MAX_MANAGED_POLICY_SIZE * 0.4)
+    b_len = int(policy.MAX_MANAGED_POLICY_SIZE * 0.7)
+    c_len = int(policy.MAX_MANAGED_POLICY_SIZE * 0.4)
+
+    old_policies = [
+        Policy(statements=[Statement({"Action": "spam", "NotResource": [char * length]})])
+        for char, length in [("a", a_len), ("b", b_len), ("c", c_len)]
+    ]
+
+    policies = policy.combine(old_policies)
+
+    new_policy_1, new_policy_2 = policies
+
+    assert new_policy_1 == Policy(
+        version="2012-10-17",
+        statements=[Statement({"Action": ["spam"], "NotResource": ["a" * a_len, "c" * c_len]})],
+    )
+
+    assert new_policy_2 == Policy(
+        version="2012-10-17",
+        statements=[Statement({"Action": ["spam"], "NotResource": "b" * b_len})],
+    )
+
+
 def test_grouped_actions():
     """Simple statements are grouped as expected, even if their resources are written oddly."""
 
