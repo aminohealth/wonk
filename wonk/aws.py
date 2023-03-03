@@ -2,12 +2,13 @@
 
 import json
 from functools import lru_cache
+from typing import Optional
 
 import boto3
 
 
 @lru_cache()
-def iam_client(*, profile: str = None):
+def iam_client(*, profile: Optional[str] = None):
     """Return a boto3 IAM client."""
 
     session = boto3.session.Session(profile_name=profile)

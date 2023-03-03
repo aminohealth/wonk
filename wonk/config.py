@@ -1,7 +1,7 @@
 """Manage Wonk's configuration."""
 
 import pathlib
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
 from pydantic import BaseModel
@@ -42,7 +42,7 @@ class Config(BaseModel):
     policy_sets: Dict[str, PolicySet]
 
 
-def load_config(config_path: pathlib.Path = None) -> Config:
+def load_config(config_path: Optional[pathlib.Path] = None) -> Config:
     """Load a configuration file and return its parsed contents."""
 
     if config_path is None:
