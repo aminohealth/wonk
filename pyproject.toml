@@ -12,21 +12,21 @@ classifiers = [
     "Intended Audience :: System Administrators",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Topic :: System :: Systems Administration"
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
-boto3 = "^1.17"
-ortools = "^9.3"
-pydantic = "^1.8"
-PyYAML = "^5.4"
-toposort = "^1.6"
-xdg = "^5.0"
+python = "^3.8"
+boto3 = "^1.26"
+ortools = "^9.5"
+pydantic = "^1.10"
+PyYAML = "^6.0"
+toposort = "^1.10"
+xdg = "^6.0"
 
 [tool.poetry.dev-dependencies]
 black = "*"
@@ -40,6 +40,9 @@ rstcheck = "*"
 
 [tool.poetry.scripts]
 wonk = "wonk.cli:handle_command_line"
+
+[tool.poetry.group.dev.dependencies]
+types-pyyaml = "^6.0.12.8"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
