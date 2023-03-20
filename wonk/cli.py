@@ -30,6 +30,12 @@ def command_line_build(args):
 
     for policy_set_name in policy_set_names:
         config = full_config.policy_sets[policy_set_name]
+
+        # Don't build combined policies for abstract policy sets
+        if config.abstract:
+            print(f"Skipping abstract policy set {policy_set_name}")
+            continue
+
         input_filenames = []
 
         for managed_policy in config.managed:
