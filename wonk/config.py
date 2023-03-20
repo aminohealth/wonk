@@ -17,6 +17,7 @@ class PolicySet(BaseModel):
     managed: List[str] = []
     local: List[str] = []
     inherits: List[str] = []
+    abstract: bool = False
 
     def __ior__(self, other):
         """Append the values from another policy set onto this one's."""

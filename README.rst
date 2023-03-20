@@ -78,6 +78,11 @@ You **could** write a bunch of ``wonk combine`` command lines, maybe in a shell 
 ::
 
     policy_sets:
+      OnCall:
+        abstract: true
+        local:
+          - OnCall
+
       Backend:
         managed:
           - AWSPolicy1
@@ -88,7 +93,6 @@ You **could** write a bunch of ``wonk combine`` command lines, maybe in a shell 
       BackendOnCall:
         inherits:
           - Backend
-        local:
           - OnCall
 
       Frontend:
@@ -100,7 +104,6 @@ You **could** write a bunch of ``wonk combine`` command lines, maybe in a shell 
       FrontendOnCall:
         inherits:
           - Frontend
-        local:
           - OnCall
 
 and then tell Wonk to build them all for you:
@@ -109,7 +112,7 @@ and then tell Wonk to build them all for you:
 
     $ wonk build --all
 
-which fetches any missing managed policies, then creates a set of combined policies named after their YAML configurations.
+which fetches any missing managed policies, then creates a set of combined policies named after their YAML configurations. Wonk skips building combined policies for abstract policy sets.
 
 A managed policy ``Foo`` is fetched by the ARN ``arn:aws:iam::aws:policy/Foo``. However, some Amazon policies don't follow that convention. In that case, you can give an ARN instead of a policy name and that ARN will be fetched instead (and the policy's name will be derived from the ARN). You could also do that if you want to fetch your own policy from Amazon instead of maintaining it locally.
 
@@ -237,7 +240,7 @@ the second statement is broader than the first, so the first could be safely rem
 Copyright
 =========
 
-The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the terms of the Apache-2.0 License.
+The Policy Wonk is copyright 2021-2023 Amino, Inc. and distributed under the terms of the Apache-2.0 License.
 
 .. _IAM quotas: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
 .. _jq: https://stedolan.github.io/jq/
@@ -246,6 +249,9 @@ The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the ter
 
 History
 =======
+**0.7.0**
+  2023-03-20: Add 'abstract' option to policy sets (default false). Wonk skips building combined policies for abstract policy sets.
+
 **0.6.1**
   2022-05-20: Important bugfix! Policies large enough to require splitting weren't being processed correctly, causing an exception. This would not have caused data corruption, just a runtime failure.
 

@@ -175,7 +175,7 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
     for old in cleanup:
         old.unlink()
 
-    # Write each of the files that file go into this policy set, and create a list of the filenames
+    # Write each of the files that go into this policy set, and create a list of the filenames
     # we've written.
     output_filenames = []
     for i, policy in enumerate(policies, 1):

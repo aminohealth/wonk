@@ -24,12 +24,18 @@ def command_line_build(args):
         sys.exit(1)
 
     if args.all:
-        policy_sets = full_config.policy_sets.keys()
+        policy_set_names = full_config.policy_sets.keys()
     else:
-        policy_sets = args.policy_set
+        policy_set_names = args.policy_set
 
-    for policy_set in policy_sets:
-        config = full_config.policy_sets[policy_set]
+    for policy_set_name in policy_set_names:
+        config = full_config.policy_sets[policy_set_name]
+
+        # Don't build combined policies for abstract policy sets
+        if config.abstract:
+            print(f"Skipping abstract policy set {policy_set_name}")
+            continue
+
         input_filenames = []
 
         for managed_policy in config.managed:
@@ -50,10 +56,10 @@ def command_line_build(args):
             input_filenames.append(f"local/{local_policy}.json")
 
         policies = policies_from_filenames(input_filenames)
-        output_filenames = write_policy_set(args.path, policy_set, combine(policies))
+        output_filenames = write_policy_set(args.path, policy_set_name, combine(policies))
 
         print()
-        print(f"Created the following files for policy set {policy_set}:")
+        print(f"Created the following files for policy set {policy_set_name}:")
         print()
         for filename in output_filenames:
             print(f"- {filename}")
