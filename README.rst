@@ -237,7 +237,7 @@ the second statement is broader than the first, so the first could be safely rem
 Copyright
 =========
 
-The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the terms of the Apache-2.0 License.
+The Policy Wonk is copyright 2021-2023 Amino, Inc. and distributed under the terms of the Apache-2.0 License.
 
 .. _IAM quotas: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
 .. _jq: https://stedolan.github.io/jq/
@@ -246,6 +246,9 @@ The Policy Wonk is copyright 2021-2022 Amino, Inc. and distributed under the ter
 
 History
 =======
+**0.7.0**
+  2023-03-20: Add 'abstract' option to policy sets (default false). Wonk will not render combined policies for abstract policy sets.
+
 **0.6.1**
   2022-05-20: Important bugfix! Policies large enough to require splitting weren't being processed correctly, causing an exception. This would not have caused data corruption, just a runtime failure.
 
