@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wonk"
-version = "0.7.0"
+version = "0.7.1"
 description = "Wonk is a tool for combining a set of AWS policy files into smaller compiled policy sets."
 license = "Apache-2.0"
 authors = ["Kirk Strauser <kirk@amino.com>"]
@@ -42,7 +42,7 @@ rstcheck = "*"
 wonk = "wonk.cli:handle_command_line"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.3.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
