@@ -158,6 +158,9 @@ def write_policy_set(output_dir: pathlib.Path, base_name: str, policies: List[Po
     # each candidate so that policy set "foo" doesn't unintentionally delete policy set "foo_bar"'s
     # files.
 
+    # Upsert 'combined' output dir if it doesn't already exist
+    output_dir.mkdir(exist_ok=True)
+
     pattern = policy_set_pattern(base_name)
     cleanup = {
         candidate
