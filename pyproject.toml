@@ -24,7 +24,7 @@ python = "^3.7"
 boto3 = "^1.17"
 ortools = "^9.3"
 pydantic = "^1.8"
-PyYAML = "^5.4"
+PyYAML = ">=5.0"
 toposort = "^1.6"
 xdg = "^5.0"
 
