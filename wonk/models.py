@@ -318,7 +318,7 @@ def collect_wildcard_matches(items: Set[str]) -> Union[str, List[str]]:
     # Build a dict of wildcard items to their regular expressions.
     patterns: Dict[str, re.Pattern] = {}
     for item in items:
-        if "*" not in item:
+        if "*" not in item or '?' in item or '**' in item:
             continue
 
         pattern_string = item.replace("*", ".*")
@@ -326,6 +326,7 @@ def collect_wildcard_matches(items: Set[str]) -> Union[str, List[str]]:
 
     new_items = []
     for item in deduped_items(items):
+        print(f'testing {item}')
         # If this item matches any of the patterns (other than itself!), then skip it. If it
         # doesn't, add it to the list of items to keep.
         if not any(
