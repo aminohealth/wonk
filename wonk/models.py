@@ -382,7 +382,11 @@ def value_to_set(statement: StatementData, key: str) -> Set[str]:
         value = statement[key]
     except KeyError:
         return set()
-    return to_set(value)
+    try:
+        return to_set(value)
+    # Handle unhashable types
+    except TypeError:
+        return value
 
 
 def which_type(statement: StatementData, choices: Tuple[StatementKey, StatementKey]) -> str:
